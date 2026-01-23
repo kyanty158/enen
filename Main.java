@@ -194,8 +194,25 @@ class GameLogic {
     public LifeEvent getEventForAge(Player player) {
         int age = player.getAge();
         String status = player.getStatus();
+        long money = player.getMoney();
         LifeEvent event;
         double dice = random();
+
+        // ==============================================
+        // 借金イベント（優先発生）: 500万円以上の借金
+        // ==============================================
+        if (money <= -5000000 && age >= 18 && dice < 0.4) {
+            return getDebtEvent(money);
+        }
+
+        // ==============================================
+        // ランダム金運イベント（低確率で発生）
+        // ==============================================
+        if (dice < 0.08 && age >= 6) {
+            LifeEvent luckyEvent = getLuckyMoneyEvent(age, status);
+            if (luckyEvent != null)
+                return luckyEvent;
+        }
 
         // ==============================================
         // 100歳: 寿命
@@ -247,26 +264,36 @@ class GameLogic {
                 event.addChoice("部活選びに悩む", 0, 10, 0, 1, "中学生");
             } else {
                 // ランダム小学生イベント
-                if (dice < 0.2) {
+                if (dice < 0.15) {
+                    // 【追加】お年玉イベント
+                    event = new LifeEvent("【お正月】親戚が集まりました。お年玉タイム！");
+                    event.addChoice("おじいちゃんにおねだり", 0, -5, 10000, 1);
+                    event.addChoice("親戚巡りをする", -5, 5, 30000, 1);
+                } else if (dice < 0.3) {
                     event = new LifeEvent("【給食】揚げパンが出ました！争奪戦です。");
                     event.addChoice("じゃんけんに参加", 0, 5, 0, 1);
                     event.addChoice("譲って徳を積む", 2, -2, 0, 1);
-                } else if (dice < 0.4) {
+                } else if (dice < 0.45) {
                     event = new LifeEvent("【夏休み】ラジオ体操に行く時間です。");
-                    event.addChoice("早起きして行く", 5, 0, 500, 1); // 参加賞
+                    event.addChoice("早起きして行く", 5, 0, 500, 1);
                     event.addChoice("寝坊する", 0, -5, 0, 1);
                 } else if (dice < 0.6) {
                     event = new LifeEvent("【掃除】掃除の時間にホウキでチャンバラごっこ。");
                     event.addChoice("先生にバレて怒られる", 0, 10, 0, 1);
                     event.addChoice("華麗に勝利する", 2, -5, 0, 1);
-                } else if (dice < 0.8) {
+                } else if (dice < 0.75) {
                     event = new LifeEvent("【習い事】親にそろばん塾に行けと言われました。");
                     event.addChoice("真面目に通う", -5, 5, 0, 1);
                     event.addChoice("サボって公園へ", 5, -5, 0, 1);
-                } else {
+                } else if (dice < 0.9) {
                     event = new LifeEvent("【秘密基地】森の中に秘密基地を作りました。");
-                    event.addChoice("お菓子を持ち寄る", 5, -10, -200, 1);
-                    event.addChoice("エロ本を隠す", 0, 5, 0, 1);
+                    event.addChoice("お菓子を持ち寄る", 5, -10, 0, 1);
+                    event.addChoice("友達と遊ぶ", 5, -5, 0, 1);
+                } else {
+                    // 【追加】お小遣いイベント
+                    event = new LifeEvent("【お手伝い】家のお手伝いをしました。");
+                    event.addChoice("お皿洗いを頑張る", 0, 0, 500, 1);
+                    event.addChoice("お風呂掃除をする", -2, 0, 1000, 1);
                 }
             }
 
@@ -319,11 +346,16 @@ class GameLogic {
                 event.addChoice("就職する", 0, 10, 0, 1, "社会人");
             } else {
                 // ランダム高校生イベント
-                if (dice < 0.2) {
+                if (dice < 0.15) {
+                    // 【追加】バイト大成功
+                    event = new LifeEvent("【バイト】今月のシフトが増えました！");
+                    event.addChoice("たくさん働いて稼ぐ", -10, 10, 80000, 1);
+                    event.addChoice("ほどほどにする", -5, 5, 40000, 1);
+                } else if (dice < 0.3) {
                     event = new LifeEvent("【バイト】放課後に内緒でバイトを始めました。");
                     event.addChoice("コンビニで働く", -5, 5, 50000, 1);
                     event.addChoice("先生に見つかる", -5, 20, 0, 1);
-                } else if (dice < 0.4) {
+                } else if (dice < 0.45) {
                     event = new LifeEvent("【修学旅行】夜の恋バナで盛り上がっています。");
                     event.addChoice("好きな人を暴露", 0, -10, 0, 1);
                     event.addChoice("先生が巡回に来た", 0, 10, 0, 1);
@@ -331,14 +363,19 @@ class GameLogic {
                     event = new LifeEvent("【通学】自転車通学中にパンクしました。");
                     event.addChoice("遅刻して歩く", -5, 5, 0, 1);
                     event.addChoice("親を呼ぶ", 0, -5, 0, 1);
-                } else if (dice < 0.8) {
+                } else if (dice < 0.75) {
                     event = new LifeEvent("【赤点】追試の危機です。");
                     event.addChoice("先生に土下座", 0, 20, 0, 1);
-                    event.addChoice("友人に教えてもらう", -5, 5, -1000, 1); // 奢る
-                } else {
+                    event.addChoice("友人に教えてもらう", -5, 5, -1000, 1);
+                } else if (dice < 0.9) {
                     event = new LifeEvent("【文化祭】クラスTシャツを作ることになりました。");
                     event.addChoice("デザイン係に立候補", -10, 10, 0, 1);
                     event.addChoice("面倒なので任せる", 0, 0, -2000, 1);
+                } else {
+                    // 【追加】お年玉（高校生版）
+                    event = new LifeEvent("【お正月】親戚からお年玉をもらいました。");
+                    event.addChoice("貯金する", 0, -5, 20000, 1);
+                    event.addChoice("すぐ使う", 5, -10, 5000, 1);
                 }
             }
 
@@ -364,14 +401,19 @@ class GameLogic {
                     } else if (dice < 0.5) {
                         event = new LifeEvent("【講義】1限の必修科目に遅刻しそうです。");
                         event.addChoice("ダッシュで行く", -5, 10, 0, 1);
-                        event.addChoice("諦めて二度寝", 10, -20, 0, 1); // 単位落とす
-                    } else if (dice < 0.75) {
+                        event.addChoice("諦めて二度寝", 10, -20, 0, 1);
+                    } else if (dice < 0.65) {
+                        // 【追加】バイト大成功（大学生版）
+                        event = new LifeEvent("【バイト】時給の良いバイトを見つけました！");
+                        event.addChoice("居酒屋の深夜帯", -15, 15, 150000, 1);
+                        event.addChoice("家庭教師", -5, 5, 100000, 1);
+                    } else if (dice < 0.8) {
                         event = new LifeEvent("【合コン】他大学との合コンに参加しました。");
                         event.addChoice("盛り上げ役に徹する", -5, 10, -5000, 1);
                         event.addChoice("運命の人を探す", 0, 20, -5000, 1);
                     } else {
                         event = new LifeEvent("【レポート】締め切りまであと1時間です。");
-                        event.addChoice("コピペで凌ぐ", 0, 30, 0, 1); // バレるリスク
+                        event.addChoice("コピペで凌ぐ", 0, 30, 0, 1);
                         event.addChoice("教授に土下座メール", 0, 20, 0, 1);
                     }
                 }
@@ -409,7 +451,7 @@ class GameLogic {
                 event.addChoice("勇気を出して取る", -2, 10, 0, 1);
                 event.addChoice("トイレに逃げ込む", 0, 5, 0, 1);
             } else if (dice < 0.4) {
-                event = new LifeEvent("【給料日】初任給が入りました！");
+                event = new LifeEvent("【給料日】お給料が入りました！");
                 event.addChoice("親にプレゼント", 0, -10, -30000, 1);
                 event.addChoice("全部趣味に使う", 5, -5, -200000, 1);
             } else if (dice < 0.6) {
@@ -426,11 +468,17 @@ class GameLogic {
                 event.addChoice("聞き役に回る", 0, 0, -5000, 1);
             }
         } else if (age < 45) { // 中堅時代
-            if (dice < 0.15) {
+            if (dice < 0.12) {
+                // 【追加】ボーナス支給
+                event = new LifeEvent("【ボーナス】夏のボーナスが支給されました！");
+                event.addChoice("全額貯金", 0, -5, 500000, 1);
+                event.addChoice("欲しいものを買う", 5, -10, 200000, 1);
+                event.addChoice("投資に回す", 0, 10, 300000, 1);
+            } else if (dice < 0.22) {
                 event = new LifeEvent("【結婚】そろそろ身を固める時期です。");
-                event.addChoice("婚活アプリに課金", 0, 5, -50000, 1, "既婚者"); // 確率で結婚
+                event.addChoice("婚活アプリに課金", 0, 5, -50000, 1, "既婚者");
                 event.addChoice("独身貴族を貫く", 5, -5, 0, 1, "独身");
-            } else if (dice < 0.3) {
+            } else if (dice < 0.35) {
                 event = new LifeEvent("【住宅】マイホームの購入を検討しています。");
                 event.addChoice("35年ローン地獄", 0, 40, -30000000, 1);
                 event.addChoice("一生賃貸派", 0, 0, -1000000, 1);
@@ -472,6 +520,69 @@ class GameLogic {
                 event = new LifeEvent("【早期退職】退職金の割り増しオファーがあります。");
                 event.addChoice("応募してリタイア", 5, -30, 20000000, 1, "無職");
                 event.addChoice("定年までしがみつく", -5, 10, 0, 1);
+            }
+        }
+        return event;
+    }
+
+    // 【追加】借金取り立てイベント
+    private LifeEvent getDebtEvent(long money) {
+        LifeEvent event;
+        if (money <= -10000000) {
+            // 1000万円以上の借金
+            event = new LifeEvent("【闇金】怖い人たちが家に押しかけてきました...");
+            event.addChoice("土下座して待ってもらう", -20, 50, 0, 1);
+            event.addChoice("夜逃げする", -30, 30, 0, 1, "逃亡者");
+            event.addChoice("臓器を売る（嘘）", -10, 40, 500000, 1);
+        } else {
+            // 500万円以上の借金
+            event = new LifeEvent("【督促】消費者金融から督促状が届きました。");
+            event.addChoice("必死に働いて返す", -15, 30, 200000, 1);
+            event.addChoice("親に泣きつく", 0, 20, 1000000, 1);
+            event.addChoice("無視する（悪手）", 0, 40, 0, 1);
+        }
+        return event;
+    }
+
+    // 【追加】金運イベント（宝くじ、投資、お年玉など）
+    private LifeEvent getLuckyMoneyEvent(int age, String status) {
+        LifeEvent event;
+        double subDice = random();
+
+        // 年齢によって発生するイベントを分岐
+        if (age <= 12) {
+            // 子供向け：お年玉
+            event = new LifeEvent("【幸運】お年玉を沢山もらえる年でした！");
+            event.addChoice("貯金箱に入れる", 0, -5, 15000, 1);
+            event.addChoice("ゲームソフトを買う", 5, -10, 5000, 1);
+        } else if (age <= 22) {
+            // 学生向け：バイト大成功 or 臨時収入
+            if (subDice < 0.5) {
+                event = new LifeEvent("【臨時収入】親戚からお小遣いをもらいました！");
+                event.addChoice("ありがたく受け取る", 0, -5, 50000, 1);
+                event.addChoice("遠慮する(嘘)", 0, 0, 30000, 1);
+            } else {
+                event = new LifeEvent("【バイト】店長に気に入られてボーナスが出た！");
+                event.addChoice("嬉しい！", 5, -10, 30000, 1);
+                event.addChoice("もっと欲しい...", 0, 5, 30000, 1);
+            }
+        } else {
+            // 大人向け：宝くじ or 投資成功
+            if (subDice < 0.4) {
+                // 宝くじ
+                event = new LifeEvent("【宝くじ】なんと宝くじが当たりました！");
+                event.addChoice("3等当選！", 10, -20, 1000000, 1);
+                event.addChoice("末等だった...", 0, 5, 3000, 1);
+            } else if (subDice < 0.7) {
+                // 投資成功
+                event = new LifeEvent("【投資】買っていた株が急騰しました！");
+                event.addChoice("今すぐ売る", 0, -10, 500000, 1);
+                event.addChoice("まだ持っておく", 0, 20, 0, 1);
+            } else {
+                // ボーナス
+                event = new LifeEvent("【臨時ボーナス】会社の業績が良く臨時ボーナスが出ました！");
+                event.addChoice("家族サービスに使う", 5, -10, 200000, 1);
+                event.addChoice("自分へのご褒美", 10, -5, 100000, 1);
             }
         }
         return event;
