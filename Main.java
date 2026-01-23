@@ -12,7 +12,10 @@ import java.util.List;
  * ==========================================
  */
 class DeathResult {
-    public enum Type { ALIVE, DEAD }
+    public enum Type {
+        ALIVE, DEAD
+    }
+
     public Type type;
     public String title;
     public String message;
@@ -42,12 +45,12 @@ class Choice {
         this.ageDelta = ageDelta;
         this.nextStatus = nextStatus;
     }
-    
+
     // 既存のコンストラクタ互換用（ステータス変更なし）
     public Choice(String text, int h, int s, long m, int ageDelta) {
         this(text, h, s, m, ageDelta, null);
     }
-    
+
     public String getText() {
         return text;
     }
@@ -72,9 +75,17 @@ class LifeEvent {
         choices.add(new Choice(text, h, s, m, ageDelta, null));
     }
 
-    public String getTitle() { return title; }
-    public String getText() { return title; }
-    public List<Choice> getChoices() { return choices; }
+    public String getTitle() {
+        return title;
+    }
+
+    public String getText() {
+        return title;
+    }
+
+    public List<Choice> getChoices() {
+        return choices;
+    }
 }
 
 class Player {
@@ -102,26 +113,35 @@ class Player {
         String log = String.format("%d歳 [%s]: %s\n   ↳ %s", age, status, eventTitle, choiceText);
         history.add(log);
     }
-    public List<String> getHistory() { return history; }
 
-    public void incrementAge(int years) { this.age += years; }
+    public List<String> getHistory() {
+        return history;
+    }
+
+    public void incrementAge(int years) {
+        this.age += years;
+    }
 
     public void setStatus(String status) {
         if (status != null) {
             this.status = status;
         }
     }
-    
-    public String getStatus() { return status; }
+
+    public String getStatus() {
+        return status;
+    }
 
     public void changeHealth(int amount) {
         this.health += amount;
-        if (this.health > 100) this.health = 100;
+        if (this.health > 100)
+            this.health = 100;
     }
 
     public void changeStress(int amount) {
         this.stress += amount;
-        if (this.stress < 0) this.stress = 0;
+        if (this.stress < 0)
+            this.stress = 0;
     }
 
     public void changeMoney(long amount) {
@@ -131,7 +151,7 @@ class Player {
     public void checkVitality() {
         // 老化ダメージ: 60歳以降
         if (age > 60) {
-            int agingDamage = (age - 60) / 4 + 1; 
+            int agingDamage = (age - 60) / 4 + 1;
             this.health -= agingDamage;
         }
 
@@ -140,11 +160,25 @@ class Player {
         }
     }
 
-    public int getAge() { return age; }
-    public boolean isAlive() { return isAlive; }
-    public int getHealth() { return health; }
-    public int getStress() { return stress; }
-    public long getMoney() { return money; }
+    public int getAge() {
+        return age;
+    }
+
+    public boolean isAlive() {
+        return isAlive;
+    }
+
+    public int getHealth() {
+        return health;
+    }
+
+    public int getStress() {
+        return stress;
+    }
+
+    public long getMoney() {
+        return money;
+    }
 }
 
 /*
@@ -153,7 +187,9 @@ class Player {
  * ==========================================
  */
 class GameLogic {
-    private double random() { return Math.random(); }
+    private double random() {
+        return Math.random();
+    }
 
     public LifeEvent getEventForAge(Player player) {
         int age = player.getAge();
@@ -200,9 +236,9 @@ class GameLogic {
                 }
             }
 
-        // ==============================================
-        // 7-12歳: 小学生 (status="小学生")
-        // ==============================================
+            // ==============================================
+            // 7-12歳: 小学生 (status="小学生")
+            // ==============================================
         } else if (age <= 12) {
             if (age == 12) {
                 // 中学入学確定イベント
@@ -234,9 +270,9 @@ class GameLogic {
                 }
             }
 
-        // ==============================================
-        // 13-15歳: 中学生 (status="中学生")
-        // ==============================================
+            // ==============================================
+            // 13-15歳: 中学生 (status="中学生")
+            // ==============================================
         } else if (age <= 15) {
             if (age == 15) {
                 // 高校進学分岐イベント
@@ -265,10 +301,10 @@ class GameLogic {
                 }
             }
 
-        // ==============================================
-        // 16-18歳: 高校生 (status="高校生")
-        // ※中卒社会人の場合はここはスキップされる
-        // ==============================================
+            // ==============================================
+            // 16-18歳: 高校生 (status="高校生")
+            // ※中卒社会人の場合はここはスキップされる
+            // ==============================================
         } else if (age <= 18) {
             // もし中卒で社会人になっていたら、社会人イベントへ飛ばすための処理
             if (status.equals("社会人")) {
@@ -306,9 +342,9 @@ class GameLogic {
                 }
             }
 
-        // ==============================================
-        // 19-22歳: 大学生/専門学生/社会人 (ステータス分岐)
-        // ==============================================
+            // ==============================================
+            // 19-22歳: 大学生/専門学生/社会人 (ステータス分岐)
+            // ==============================================
         } else if (age <= 22) {
             if (status.equals("社会人")) {
                 // 高卒・中卒社会人ルート
@@ -346,15 +382,15 @@ class GameLogic {
                 event.addChoice("実家でゴロゴロ", 5, 0, 0, 1, "ニート");
             }
 
-        // ==============================================
-        // 23-59歳: 社会人・大人時代 (汎用プール)
-        // ==============================================
+            // ==============================================
+            // 23-59歳: 社会人・大人時代 (汎用プール)
+            // ==============================================
         } else if (age <= 59) {
             return getAdultEvent(age, dice);
 
-        // ==============================================
-        // 60-99歳: 老後
-        // ==============================================
+            // ==============================================
+            // 60-99歳: 老後
+            // ==============================================
         } else {
             return getSeniorEvent(age, dice);
         }
@@ -365,7 +401,7 @@ class GameLogic {
     // 社会人・大人時代のイベントプール（数が多いのでメソッド分離）
     private LifeEvent getAdultEvent(int age, double dice) {
         LifeEvent event;
-        
+
         // 年代別補正
         if (age < 30) { // 若手社員時代
             if (dice < 0.2) {
@@ -483,7 +519,9 @@ class GameModel {
         this.logic = new GameLogic();
     }
 
-    public Player getPlayer() { return player; }
+    public Player getPlayer() {
+        return player;
+    }
 
     public LifeEvent nextEvent() {
         return logic.getEventForAge(player);
@@ -502,23 +540,22 @@ class GameModel {
         player.changeHealth(choice.healthDelta);
         player.changeStress(choice.stressDelta);
         player.changeMoney(choice.moneyDelta);
-        
+
         // 3. 生存チェック
         player.checkVitality();
 
         if (!player.isAlive()) {
             String reason = (player.getHealth() <= 0) ? "病死・衰弱死" : "ストレス死";
             return new DeathResult(
-                DeathResult.Type.DEAD, 
-                reason, 
-                "志半ばで力尽きました...", 
-                player.getAge()
-            );
+                    DeathResult.Type.DEAD,
+                    reason,
+                    "志半ばで力尽きました...",
+                    player.getAge());
         }
 
         // 4. 年齢を加算
         player.incrementAge(choice.ageDelta);
-        
+
         return new DeathResult(DeathResult.Type.ALIVE, "", "", player.getAge());
     }
 }
@@ -556,10 +593,10 @@ class GameView extends JFrame {
 
         JPanel infoPanel = new JPanel(new GridLayout(2, 2)); // グリッド変更
         infoPanel.setBackground(BG_COLOR);
-        
+
         ageLabel.setFont(new Font("SansSerif", Font.BOLD, 28));
         ageLabel.setForeground(ACCENT_COLOR);
-        
+
         moneyLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
         moneyLabel.setForeground(Color.YELLOW);
         moneyLabel.setHorizontalAlignment(SwingConstants.RIGHT);
@@ -570,7 +607,7 @@ class GameView extends JFrame {
         infoPanel.add(ageLabel);
         infoPanel.add(moneyLabel);
         infoPanel.add(statusLabel); // ステータス追加
-        infoPanel.add(new JLabel("")); 
+        infoPanel.add(new JLabel(""));
 
         topPanel.add(infoPanel);
         topPanel.add(Box.createVerticalStrut(10));
@@ -592,10 +629,9 @@ class GameView extends JFrame {
         eventArea.setBackground(new Color(60, 64, 72));
         eventArea.setForeground(TEXT_COLOR);
         eventArea.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(Color.GRAY),
-            BorderFactory.createEmptyBorder(15, 15, 15, 15)
-        ));
-        
+                BorderFactory.createLineBorder(Color.GRAY),
+                BorderFactory.createEmptyBorder(15, 15, 15, 15)));
+
         centerPanel.add(eventArea, BorderLayout.CENTER);
         add(centerPanel, BorderLayout.CENTER);
 
@@ -627,7 +663,7 @@ class GameView extends JFrame {
         ageLabel.setText(player.getAge() + "歳");
         moneyLabel.setText(String.format("%,d円", player.getMoney()));
         statusLabel.setText("身分: " + player.getStatus());
-        
+
         healthBar.setValue(player.getHealth());
         healthBar.setString(player.getHealth() + "/100");
         stressBar.setValue(player.getStress());
@@ -653,26 +689,231 @@ class GameView extends JFrame {
         buttonPanel.repaint();
     }
 
-    public void showGameOver(String title, String message, int age, Player player) {
-        StringBuilder logBuilder = new StringBuilder();
-        logBuilder.append("<html><body style='width: 300px; font-family: sans-serif;'>");
-        logBuilder.append("<h2>").append(title).append("</h2>");
-        logBuilder.append("<p><b>享年: ").append(age).append("歳</b></p>");
-        logBuilder.append("<p>").append(message).append("</p><hr>");
-        logBuilder.append("<h3>--- 人生の軌跡 ---</h3>");
-        
-        StringBuilder historyText = new StringBuilder();
+    public void showGameOver(String title, String message, int age, Player player, Runnable onRestart) {
+        new ResultView(title, message, age, player, onRestart);
+        dispose(); // ゲーム画面を閉じる
+    }
+}
+
+/*
+ * ==========================================
+ * RESULT VIEW (結果画面)
+ * ==========================================
+ */
+class ResultView extends JFrame {
+    private final Color BG_COLOR = new Color(25, 28, 35);
+    private final Color TEXT_COLOR = new Color(220, 223, 228);
+    private final Color ACCENT_COLOR = new Color(231, 76, 60); // 赤 (GameOver用)
+    private final Color LEGEND_COLOR = new Color(241, 196, 15); // 金 (大往生用)
+
+    public ResultView(String title, String message, int age, Player player, Runnable onRestart) {
+        setTitle("結果発表");
+        setSize(550, 800);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setLayout(new BorderLayout());
+        getContentPane().setBackground(BG_COLOR);
+
+        Color titleColor = ("伝説のエンド".equals(title) || "大往生".equals(title)) ? LEGEND_COLOR : ACCENT_COLOR;
+
+        // --- HEADER ---
+        JPanel headerPanel = new JPanel();
+        headerPanel.setLayout(new BoxLayout(headerPanel, BoxLayout.Y_AXIS));
+        headerPanel.setBackground(BG_COLOR);
+        headerPanel.setBorder(BorderFactory.createEmptyBorder(30, 20, 20, 20));
+
+        JLabel titleLabel = new JLabel(title);
+        titleLabel.setFont(new Font("SansSerif", Font.BOLD, 36));
+        titleLabel.setForeground(titleColor);
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel ageLabel = new JLabel("享年 " + age + " 歳");
+        ageLabel.setFont(new Font("SansSerif", Font.PLAIN, 24));
+        ageLabel.setForeground(Color.WHITE);
+        ageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel msgLabel = new JLabel(
+                "<html><div style='text-align: center; width: 400px;'>" + message + "</div></html>");
+        msgLabel.setFont(new Font("SansSerif", Font.PLAIN, 16));
+        msgLabel.setForeground(Color.LIGHT_GRAY);
+        msgLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        headerPanel.add(titleLabel);
+        headerPanel.add(Box.createVerticalStrut(10));
+        headerPanel.add(ageLabel);
+        headerPanel.add(Box.createVerticalStrut(20));
+        headerPanel.add(msgLabel);
+
+        // --- HISTORY LOG (CENTER) ---
+        JPanel historyPanel = new JPanel(new BorderLayout());
+        historyPanel.setBackground(BG_COLOR);
+        historyPanel.setBorder(BorderFactory.createEmptyBorder(10, 30, 10, 30));
+
+        JLabel logTitle = new JLabel("--- 人生の軌跡 ---");
+        logTitle.setFont(new Font("SansSerif", Font.BOLD, 14));
+        logTitle.setForeground(Color.GRAY);
+        logTitle.setHorizontalAlignment(SwingConstants.CENTER);
+
+        JTextArea logArea = new JTextArea();
+        logArea.setEditable(false);
+        logArea.setBackground(new Color(35, 38, 45));
+        logArea.setForeground(TEXT_COLOR);
+        logArea.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        logArea.setMargin(new Insets(10, 10, 10, 10));
+
+        StringBuilder sb = new StringBuilder();
         for (String log : player.getHistory()) {
-            historyText.append(log).append("\n");
+            sb.append(log).append("\n\n");
         }
+        logArea.setText(sb.toString());
+        logArea.setCaretPosition(0); // 先頭を表示
 
-        JTextArea textArea = new JTextArea(historyText.toString());
-        textArea.setEditable(false);
-        JScrollPane scrollPane = new JScrollPane(textArea);
-        scrollPane.setPreferredSize(new Dimension(450, 400));
+        JScrollPane scrollPane = new JScrollPane(logArea);
+        scrollPane.setBorder(BorderFactory.createLineBorder(new Color(60, 60, 60)));
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
 
-        JOptionPane.showMessageDialog(this, scrollPane, title, JOptionPane.PLAIN_MESSAGE);
-        System.exit(0);
+        historyPanel.add(logTitle, BorderLayout.NORTH);
+        historyPanel.add(scrollPane, BorderLayout.CENTER);
+
+        // --- FOOTER (BUTTONS) ---
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.setBackground(BG_COLOR);
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        JButton restartButton = new JButton("タイトルへ戻る");
+        restartButton.setFont(new Font("SansSerif", Font.BOLD, 18));
+        restartButton.setForeground(Color.BLACK);
+        restartButton.setBackground(Color.WHITE);
+        restartButton.setFocusPainted(false);
+        restartButton.setPreferredSize(new Dimension(200, 50));
+        restartButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        restartButton.addActionListener(e -> {
+            dispose();
+            onRestart.run();
+        });
+
+        buttonPanel.add(restartButton);
+
+        add(headerPanel, BorderLayout.NORTH);
+        add(historyPanel, BorderLayout.CENTER);
+        add(buttonPanel, BorderLayout.SOUTH);
+
+        setLocationRelativeTo(null);
+        setVisible(true);
+    }
+}
+
+/*
+ * ==========================================
+ * TITLE VIEW (タイトル画面)
+ * ==========================================
+ */
+class TitleView extends JFrame {
+    private final Color BG_COLOR = new Color(25, 28, 35);
+    private final Color ACCENT_COLOR = new Color(97, 175, 239);
+    private final Color GOLD_COLOR = new Color(255, 215, 0);
+
+    public TitleView(Runnable onStart) {
+        setTitle("人生100年サバイバル");
+        setSize(500, 700);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setLayout(new BorderLayout());
+        getContentPane().setBackground(BG_COLOR);
+
+        // メインパネル
+        JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
+        mainPanel.setBackground(BG_COLOR);
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(80, 50, 80, 50));
+
+        // タイトルラベル
+        JLabel titleLabel = new JLabel("人生100年");
+        titleLabel.setFont(new Font("SansSerif", Font.BOLD, 48));
+        titleLabel.setForeground(GOLD_COLOR);
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel subtitleLabel = new JLabel("サバイバル");
+        subtitleLabel.setFont(new Font("SansSerif", Font.BOLD, 42));
+        subtitleLabel.setForeground(ACCENT_COLOR);
+        subtitleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // キャッチコピー
+        JLabel catchLabel = new JLabel("〜 選択が運命を変える 〜");
+        catchLabel.setFont(new Font("SansSerif", Font.ITALIC, 16));
+        catchLabel.setForeground(Color.LIGHT_GRAY);
+        catchLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // バージョン情報
+        JLabel versionLabel = new JLabel("分岐強化版 v2.0");
+        versionLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        versionLabel.setForeground(Color.GRAY);
+        versionLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // スタートボタン
+        JButton startButton = new JButton("▶ ゲームスタート");
+        startButton.setFont(new Font("SansSerif", Font.BOLD, 20));
+        startButton.setForeground(Color.WHITE);
+        startButton.setBackground(new Color(46, 204, 113));
+        startButton.setFocusPainted(false);
+        startButton.setBorderPainted(false);
+        startButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        startButton.setMaximumSize(new Dimension(250, 60));
+        startButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        // ホバー効果
+        startButton.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                startButton.setBackground(new Color(39, 174, 96));
+            }
+
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                startButton.setBackground(new Color(46, 204, 113));
+            }
+        });
+
+        startButton.addActionListener(e -> {
+            dispose(); // タイトル画面を閉じる
+            onStart.run(); // ゲーム開始
+        });
+
+        // 説明テキスト
+        JTextArea descArea = new JTextArea(
+                "【ルール】\n" +
+                        "・0歳から100歳を目指して生き抜け！\n" +
+                        "・体力が0になると死亡\n" +
+                        "・ストレスが100になると死亡\n" +
+                        "・選択によって人生が大きく変わる");
+        descArea.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        descArea.setForeground(Color.LIGHT_GRAY);
+        descArea.setBackground(new Color(35, 38, 45));
+        descArea.setEditable(false);
+        descArea.setLineWrap(true);
+        descArea.setWrapStyleWord(true);
+        descArea.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Color.GRAY),
+                BorderFactory.createEmptyBorder(15, 15, 15, 15)));
+        descArea.setMaximumSize(new Dimension(400, 150));
+        descArea.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // 配置
+        mainPanel.add(Box.createVerticalGlue());
+        mainPanel.add(titleLabel);
+        mainPanel.add(Box.createVerticalStrut(5));
+        mainPanel.add(subtitleLabel);
+        mainPanel.add(Box.createVerticalStrut(10));
+        mainPanel.add(catchLabel);
+        mainPanel.add(Box.createVerticalStrut(5));
+        mainPanel.add(versionLabel);
+        mainPanel.add(Box.createVerticalStrut(50));
+        mainPanel.add(startButton);
+        mainPanel.add(Box.createVerticalStrut(40));
+        mainPanel.add(descArea);
+        mainPanel.add(Box.createVerticalGlue());
+
+        add(mainPanel, BorderLayout.CENTER);
+
+        setLocationRelativeTo(null);
+        setVisible(true);
     }
 }
 
@@ -682,14 +923,22 @@ class GameView extends JFrame {
  * ==========================================
  */
 class GameController implements ActionListener {
-    private final GameModel model;
-    private final GameView view;
+    private GameModel model;
+    private GameView view;
     private LifeEvent currentEvent;
 
     public GameController() {
-        model = new GameModel();
-        view = new GameView(this);
-        nextTurn();
+        // タイトル画面を表示
+        showTitleScreen();
+    }
+
+    private void showTitleScreen() {
+        new TitleView(() -> {
+            // ゲーム開始時の処理
+            model = new GameModel();
+            view = new GameView(this);
+            nextTurn();
+        });
     }
 
     private void nextTurn() {
@@ -701,7 +950,8 @@ class GameController implements ActionListener {
     @Override
     public void actionPerformed(ActionEvent e) {
         int index = Integer.parseInt(e.getActionCommand());
-        if (index < 0 || index >= currentEvent.getChoices().size()) return;
+        if (index < 0 || index >= currentEvent.getChoices().size())
+            return;
 
         Choice selected = currentEvent.getChoices().get(index);
         DeathResult result = model.applyChoice(selected, currentEvent.getTitle());
@@ -710,7 +960,10 @@ class GameController implements ActionListener {
             nextTurn();
         } else {
             view.updateDisplay(model.getPlayer());
-            view.showGameOver(result.title, result.message, result.age, model.getPlayer());
+            // Restart用のコールバックを渡す
+            view.showGameOver(result.title, result.message, result.age, model.getPlayer(), () -> {
+                showTitleScreen();
+            });
         }
     }
 }
