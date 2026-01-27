@@ -28,6 +28,33 @@ class GameLogic {
         double dice = random();
 
         // ==============================================
+        // 章の切り替え
+        // ==============================================
+        Chapter chapter = Chapter.fromAge(age);
+        if (player.getChapter() == null || player.getChapter() != chapter) {
+            player.setChapter(chapter);
+            return getChapterEvent(chapter);
+        }
+
+        // ==============================================
+        // 連続イベント（深掘り）
+        // ==============================================
+        LifeEvent sequel = getSequelEvent(player);
+        if (sequel != null) {
+            return sequel;
+        }
+
+        // ==============================================
+        // 場所イベント
+        // ==============================================
+        if (dice < 0.25) {
+            LifeEvent loc = getLocationEvent(player);
+            if (loc != null) {
+                return loc;
+            }
+        }
+
+        // ==============================================
         // 借金イベント（優先発生）: 500万円以上の借金
         // ==============================================
         if (money <= -5000000 && age >= 18 && dice < 0.4) {
@@ -512,6 +539,73 @@ class GameLogic {
             return null;
         }
         return pickEvent(player, pool);
+    }
+
+    private LifeEvent getChapterEvent(Chapter chapter) {
+        LifeEvent event = new LifeEvent("【章開始】" + chapter.getTitle());
+        event.addChoice("新たな章へ進む", 0, 0, 0, 0);
+        return event;
+    }
+
+    private LifeEvent getLocationEvent(Player player) {
+        Location loc = player.getLocation();
+        if (loc == null) {
+            return null;
+        }
+        LifeEvent event;
+        if (loc == Location.HOME) {
+            event = new LifeEvent("【家】部屋の片付けをするか迷っています。");
+            event.addChoice("片付ける", 5, -5, 0, 1);
+            event.addChoice("後回しにする", -2, 5, 0, 1);
+            return event;
+        }
+        if (loc == Location.SCHOOL) {
+            event = new LifeEvent("【学校】小テストが始まりました。");
+            event.addChoice("全力で解く", -5, 10, 0, 1);
+            event.addChoice("白紙で出す", 5, -5, 0, 1);
+            return event;
+        }
+        if (loc == Location.WORK) {
+            event = new LifeEvent("【職場】急な会議が入りました。");
+            event.addChoice("準備して挑む", -5, 10, 0, 1);
+            event.addChoice("適当に流す", 2, 5, 0, 1);
+            return event;
+        }
+        event = new LifeEvent("【街】買い物の誘惑が多いです。");
+        event.addChoice("必要な物だけ買う", 2, -2, -5000, 1);
+        event.addChoice("衝動買いする", -2, 5, -20000, 1);
+        return event;
+    }
+
+    private LifeEvent getSequelEvent(Player player) {
+        String last = player.getLastEventTitle();
+        if (last == null) {
+            return null;
+        }
+        double dice = random();
+        if (dice > 0.15) {
+            return null;
+        }
+
+        LifeEvent event = null;
+        if (last.contains("中二病")) {
+            event = new LifeEvent("【黒歴史】あの頃のノートが見つかりました。");
+            event.addChoice("燃やす", 0, -10, 0, 1);
+            event.addChoice("読み返して悶える", -5, 10, 0, 1);
+        } else if (last.contains("合コン") || last.contains("恋愛")) {
+            event = new LifeEvent("【続編】連絡先交換から数日後…");
+            event.addChoice("デートに誘う", -2, 10, -5000, 1);
+            event.addChoice("既読スルー", 2, -5, 0, 1);
+        } else if (last.contains("借金") || last.contains("督促") || last.contains("闇金")) {
+            event = new LifeEvent("【追い打ち】返済期限が迫っています。");
+            event.addChoice("親族に頭を下げる", 0, 20, 1000000, 1);
+            event.addChoice("別口で稼ぐ", -10, 15, 300000, 1);
+        } else if (last.contains("病院") || last.contains("健康診断")) {
+            event = new LifeEvent("【再検査】結果を聞きに行きます。");
+            event.addChoice("検査を受ける", 5, 5, -30000, 1);
+            event.addChoice("怖くて行かない", -10, 10, 0, 1);
+        }
+        return event;
     }
 
     // 社会人・大人時代のイベントプール（数が多いのでメソッド分離）

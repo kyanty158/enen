@@ -18,6 +18,11 @@ class Player {
     private List<String> history;
     private Set<String> seenEvents;
     private Map<String, Integer> pickedTags;
+    private String lastEventTitle;
+    private List<StatPoint> statPoints;
+    private List<Npc> npcs;
+    private Location location;
+    private Chapter chapter;
 
     public Player() {
         this("プレイヤー", 0, 100, 0, 0, "幼児");
@@ -34,12 +39,19 @@ class Player {
         this.history = new ArrayList<>();
         this.seenEvents = new HashSet<>();
         this.pickedTags = new HashMap<>();
+        this.lastEventTitle = null;
+        this.statPoints = new ArrayList<>();
+        this.npcs = new ArrayList<>();
+        this.location = Location.HOME;
+        this.chapter = Chapter.fromAge(age);
+        recordStatPoint();
     }
 
     public void addHistory(String eventTitle, String choiceText) {
         String log = String.format("%d歳 [%s]: %s\n   ↳ %s", age, status, eventTitle, choiceText);
         history.add(log);
         rememberEvent(eventTitle);
+        setLastEventTitle(eventTitle);
     }
 
     public List<String> getHistory() {
@@ -74,6 +86,85 @@ class Player {
         if (counts != null) {
             pickedTags.putAll(counts);
         }
+    }
+
+    public String getLastEventTitle() {
+        return lastEventTitle;
+    }
+
+    public void setLastEventTitle(String title) {
+        this.lastEventTitle = title;
+    }
+
+    public Location getLocation() {
+        return location;
+    }
+
+    public void setLocation(Location location) {
+        if (location != null) {
+            this.location = location;
+        }
+    }
+
+    public Chapter getChapter() {
+        return chapter;
+    }
+
+    public void setChapter(Chapter chapter) {
+        if (chapter != null) {
+            this.chapter = chapter;
+        }
+    }
+
+    public void recordStatPoint() {
+        statPoints.add(new StatPoint(age, health, stress));
+    }
+
+    public List<StatPoint> getStatPoints() {
+        return new ArrayList<>(statPoints);
+    }
+
+    public void setStatPoints(List<StatPoint> points) {
+        statPoints = new ArrayList<>();
+        if (points != null) {
+            statPoints.addAll(points);
+        }
+    }
+
+    public List<Npc> getNpcs() {
+        return new ArrayList<>(npcs);
+    }
+
+    public void setNpcs(List<Npc> list) {
+        npcs = new ArrayList<>();
+        if (list != null) {
+            npcs.addAll(list);
+        }
+    }
+
+    public void bumpNpc(String type, int delta, String context) {
+        if (type == null) {
+            return;
+        }
+        for (Npc npc : npcs) {
+            if (type.equals(npc.getType())) {
+                npc.addRelation(npcAdjustedDelta(npc, delta, context));
+                return;
+            }
+        }
+        Npc created = new Npc(NameGenerator.randomName(), type, delta);
+        created.addRelation(npcAdjustedDelta(created, 0, context));
+        npcs.add(created);
+    }
+
+    private int npcAdjustedDelta(Npc npc, int delta, String context) {
+        int adjusted = delta;
+        String traits = npc.getTraitsText();
+        if (traits.contains("優しい")) adjusted += 2;
+        if (traits.contains("ドライ")) adjusted -= 1;
+        if (traits.contains("情熱")) adjusted += 1;
+        if (traits.contains("嫉妬深い") && context != null && context.contains("合コン")) adjusted -= 3;
+        return adjusted;
     }
 
     public boolean hasSeenEvent(String title) {

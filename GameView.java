@@ -1,7 +1,9 @@
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.border.Border;
 import java.awt.*;
 import java.awt.event.ActionListener;
+import java.awt.event.ActionEvent;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
@@ -12,12 +14,18 @@ class GameView extends JFrame {
     private final JLabel statusLabel = new JLabel();
     private final JLabel nameLabel = new JLabel();
     private final JLabel difficultyLabel = new JLabel();
+    private final JLabel tendencyLabel = new JLabel();
+    private final JLabel relationLabel = new JLabel();
+    private final JLabel moodLabel = new JLabel();
+    private final JLabel economyLabel = new JLabel();
+    private final JComboBox<String> locationBox = new JComboBox<>(new String[] { "家", "学校", "職場", "街" });
     private final JProgressBar healthBar = new JProgressBar(0, 100);
     private final JProgressBar stressBar = new JProgressBar(0, 100);
     private final JTextArea eventArea = new JTextArea();
     private final JTextArea resultArea = new JTextArea();
     private final JPanel buttonPanel = new JPanel();
     private final JPanel actionPanel = new JPanel();
+    private Border defaultEventBorder;
 
     private final Color BG_COLOR = new Color(40, 44, 52);
     private final Color TEXT_COLOR = new Color(220, 223, 228);
@@ -42,7 +50,7 @@ class GameView extends JFrame {
         topPanel.setBackground(BG_COLOR);
         topPanel.setBorder(new EmptyBorder(15, 15, 10, 15));
 
-        JPanel infoPanel = new JPanel(new GridLayout(3, 2));
+        JPanel infoPanel = new JPanel(new GridLayout(6, 2));
         infoPanel.setBackground(BG_COLOR);
 
         ageLabel.setFont(new Font("SansSerif", Font.BOLD, 28));
@@ -61,12 +69,30 @@ class GameView extends JFrame {
         difficultyLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
         difficultyLabel.setForeground(Color.LIGHT_GRAY);
 
+        tendencyLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        tendencyLabel.setForeground(Color.LIGHT_GRAY);
+
+        relationLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        relationLabel.setForeground(Color.LIGHT_GRAY);
+
+        moodLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        moodLabel.setForeground(Color.LIGHT_GRAY);
+
+        economyLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        economyLabel.setForeground(Color.LIGHT_GRAY);
+
         infoPanel.add(ageLabel);
         infoPanel.add(moneyLabel);
         infoPanel.add(statusLabel);
         infoPanel.add(new JLabel(""));
         infoPanel.add(nameLabel);
         infoPanel.add(difficultyLabel);
+        infoPanel.add(tendencyLabel);
+        infoPanel.add(relationLabel);
+        infoPanel.add(new JLabel(""));
+        infoPanel.add(moodLabel);
+        infoPanel.add(new JLabel(""));
+        infoPanel.add(economyLabel);
 
         topPanel.add(infoPanel);
         topPanel.add(Box.createVerticalStrut(8));
@@ -98,9 +124,10 @@ class GameView extends JFrame {
         eventArea.setFont(new Font("SansSerif", Font.PLAIN, 18));
         eventArea.setBackground(new Color(60, 64, 72));
         eventArea.setForeground(TEXT_COLOR);
-        eventArea.setBorder(BorderFactory.createCompoundBorder(
+        defaultEventBorder = BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(Color.GRAY),
-                BorderFactory.createEmptyBorder(15, 15, 15, 15)));
+                BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        eventArea.setBorder(defaultEventBorder);
 
         centerPanel.add(resultArea, BorderLayout.NORTH);
         centerPanel.add(eventArea, BorderLayout.CENTER);
@@ -134,10 +161,24 @@ class GameView extends JFrame {
         JButton saveButton = createActionButton("セーブ", "SAVE", listener);
         JButton loadButton = createActionButton("ロード", "LOAD", listener);
         JButton historyButton = createActionButton("履歴", "HISTORY", listener);
+        JButton luckyButton = createActionButton("運試し", "LUCKY", listener);
+        JButton storyButton = createActionButton("物語", "STORY", listener);
 
         actionPanel.add(saveButton);
         actionPanel.add(loadButton);
         actionPanel.add(historyButton);
+        actionPanel.add(luckyButton);
+        actionPanel.add(storyButton);
+
+        locationBox.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        locationBox.setBackground(new Color(230, 230, 230));
+        locationBox.addActionListener(e -> {
+            String label = (String) locationBox.getSelectedItem();
+            Location loc = Location.fromLabel(label);
+            ActionEvent ev = new ActionEvent(locationBox, ActionEvent.ACTION_PERFORMED, "LOC_" + loc.name());
+            listener.actionPerformed(ev);
+        });
+        actionPanel.add(locationBox);
     }
 
     private JButton createActionButton(String text, String command, ActionListener listener) {
@@ -178,13 +219,28 @@ class GameView extends JFrame {
 
         healthBar.setValue(player.getHealth());
         stressBar.setValue(player.getStress());
+
+        String tendency = computeTendency(player);
+        String relation = computeRelation(player);
+        tendencyLabel.setText("傾向: " + tendency);
+        relationLabel.setText("人間関係: " + relation);
+        if (player.getLocation() != null) {
+            locationBox.setSelectedItem(player.getLocation().getLabel());
+        }
     }
 
     public void showEvent(LifeEvent event, ActionListener listener, Function<Choice, ChoiceEffect> effectMapper) {
         eventArea.setText(event.getText());
+        applyEventTheme(event.getTitle());
         buttonPanel.removeAll();
         List<Choice> choices = event.getChoices();
+        java.util.List<Integer> order = new java.util.ArrayList<>();
         for (int i = 0; i < choices.size(); i++) {
+            order.add(i);
+        }
+        java.util.Collections.shuffle(order);
+        for (int idx = 0; idx < order.size(); idx++) {
+            int i = order.get(idx);
             Choice choice = choices.get(i);
             ChoiceEffect effect = effectMapper != null ? effectMapper.apply(choice)
                     : new ChoiceEffect(choice.healthDelta, choice.stressDelta, choice.moneyDelta, choice.ageDelta,
@@ -193,7 +249,11 @@ class GameView extends JFrame {
             JButton b = new JButton(formatChoiceText(choice, effect));
             b.setFont(new Font("SansSerif", Font.BOLD, 14));
             b.setFocusPainted(false);
-            b.setBackground(new Color(240, 240, 240));
+            if (isBranchEvent(event.getTitle())) {
+                b.setBackground(new Color(255, 236, 179));
+            } else {
+                b.setBackground(new Color(240, 240, 240));
+            }
             b.setForeground(Color.BLACK);
             b.setHorizontalAlignment(SwingConstants.LEFT);
             b.setPreferredSize(new Dimension(100, 50));
@@ -243,6 +303,14 @@ class GameView extends JFrame {
 
     public void showHistory(Player player, GameStats stats, Set<Achievement> achievements) {
         new HistoryView(player, stats, achievements);
+    }
+
+    public void updateEconomy(Economy economy) {
+        if (economy == null) {
+            economyLabel.setText("景気: -");
+            return;
+        }
+        economyLabel.setText("景気: " + economy.getLabel() + " / " + economy.getInflationLabel());
     }
 
     private void flashBar(JProgressBar bar, Color flashColor) {
@@ -307,6 +375,81 @@ class GameView extends JFrame {
             return "↓";
         }
         return "→";
+    }
+
+    private void applyEventTheme(String title) {
+        if (title == null) {
+            return;
+        }
+        Color themed = new Color(60, 64, 72);
+        String mood = "日常";
+        if (title.contains("恋愛") || title.contains("合コン") || title.contains("告白")) {
+            themed = new Color(70, 40, 55);
+            mood = "恋愛";
+        } else if (title.contains("病院") || title.contains("健康") || title.contains("再検査")) {
+            themed = new Color(35, 45, 70);
+            mood = "健康";
+        } else if (title.contains("借金") || title.contains("闇金") || title.contains("督促")) {
+            themed = new Color(70, 35, 35);
+            mood = "危機";
+        } else if (title.contains("宝くじ") || title.contains("ボーナス")) {
+            themed = new Color(70, 60, 25);
+            mood = "金運";
+        } else if (title.contains("分岐") || title.contains("進路") || title.contains("選択")) {
+            themed = new Color(50, 50, 75);
+            mood = "分岐";
+        }
+        eventArea.setBackground(themed);
+        moodLabel.setText("ムード: " + mood);
+        if (isBranchEvent(title)) {
+            Color borderColor = title.contains("分岐") || title.contains("進路") ? new Color(241, 196, 15)
+                    : new Color(231, 76, 60);
+            eventArea.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(borderColor, 2),
+                    BorderFactory.createEmptyBorder(15, 15, 15, 15)));
+        } else {
+            eventArea.setBorder(defaultEventBorder);
+        }
+    }
+
+    private String computeTendency(Player player) {
+        int health = player.countTag("health");
+        int social = player.countTag("social");
+        int invest = player.countTag("invest");
+        int family = player.countTag("family");
+        int max = Math.max(Math.max(health, social), Math.max(invest, family));
+        if (max == 0) {
+            return "未定";
+        }
+        if (max == health) {
+            return "健康派";
+        }
+        if (max == social) {
+            return "社交派";
+        }
+        if (max == invest) {
+            return "堅実派";
+        }
+        return "家族派";
+    }
+
+    private String computeRelation(Player player) {
+        int social = player.countTag("social");
+        if (social >= 12) {
+            return "高";
+        }
+        if (social >= 5) {
+            return "中";
+        }
+        return "低";
+    }
+
+    private boolean isBranchEvent(String title) {
+        if (title == null) {
+            return false;
+        }
+        return title.contains("分岐") || title.contains("進路") || title.contains("選択") || title.contains("卒業")
+                || title.contains("入学");
     }
 
     private String escapeHtml(String text) {

@@ -19,5 +19,11 @@ class SaveData implements Serializable {
     public Set<Achievement> achievements;
     public GameConfig config;
     public Map<String, Integer> tagCounts;
+    public String lastEventTitle;
+    public List<StatPoint> statPoints;
+    public List<Npc> npcs;
+    public Economy economy;
+    public Location location;
+    public Chapter chapter;
     public long savedAt;
 }

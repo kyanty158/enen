@@ -160,6 +160,20 @@ class TitleView extends JFrame {
             onLoad.run();
         });
 
+        JButton endingsButton = new JButton("▶ 図鑑");
+        endingsButton.setFont(new Font("SansSerif", Font.BOLD, 16));
+        endingsButton.setForeground(Color.WHITE);
+        endingsButton.setBackground(new Color(155, 89, 182));
+        endingsButton.setFocusPainted(false);
+        endingsButton.setBorderPainted(false);
+        endingsButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        endingsButton.setMaximumSize(new Dimension(260, 44));
+        endingsButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        endingsButton.addActionListener(e -> {
+            new EndingsView();
+        });
+
         // 説明テキスト
         JTextArea descArea = new JTextArea(
                 "【ルール】\n" +
@@ -199,6 +213,8 @@ class TitleView extends JFrame {
         mainPanel.add(startButton);
         mainPanel.add(Box.createVerticalStrut(10));
         mainPanel.add(loadButton);
+        mainPanel.add(Box.createVerticalStrut(8));
+        mainPanel.add(endingsButton);
         mainPanel.add(Box.createVerticalStrut(20));
         mainPanel.add(descArea);
         mainPanel.add(Box.createVerticalGlue());

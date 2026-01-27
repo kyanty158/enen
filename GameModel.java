@@ -7,6 +7,7 @@ class GameModel {
     private final Player player;
     private final GameLogic logic;
     private final Difficulty difficulty;
+    private final Economy economy;
     private final GameStats stats;
     private final Set<Achievement> achievements;
     private final GameConfig config;
@@ -21,6 +22,7 @@ class GameModel {
         this.logic = new GameLogic();
         this.stats = new GameStats(player);
         this.achievements = new LinkedHashSet<>();
+        this.economy = new Economy();
         updateAchievements();
     }
 
@@ -44,6 +46,21 @@ class GameModel {
             if (data.tagCounts != null) {
                 player.setTagCounts(data.tagCounts);
             }
+            if (data.lastEventTitle != null) {
+                player.setLastEventTitle(data.lastEventTitle);
+            }
+            if (data.statPoints != null) {
+                player.setStatPoints(data.statPoints);
+            }
+            if (data.npcs != null) {
+                player.setNpcs(data.npcs);
+            }
+            if (data.location != null) {
+                player.setLocation(data.location);
+            }
+            if (data.chapter != null) {
+                player.setChapter(data.chapter);
+            }
         }
 
         if (data != null && data.config != null) {
@@ -57,6 +74,7 @@ class GameModel {
         this.achievements = (data != null && data.achievements != null)
                 ? new LinkedHashSet<>(data.achievements)
                 : new LinkedHashSet<>();
+        this.economy = (data != null && data.economy != null) ? data.economy : new Economy();
         updateAchievements();
     }
 
@@ -66,6 +84,10 @@ class GameModel {
 
     public Difficulty getDifficulty() {
         return difficulty;
+    }
+
+    public Economy getEconomy() {
+        return economy;
     }
 
     public GameStats getStats() {
@@ -81,7 +103,9 @@ class GameModel {
     }
 
     public ChoiceEffect getEffectiveEffect(Choice choice) {
-        return difficulty.apply(choice);
+        ChoiceEffect base = difficulty.apply(choice);
+        long money = economy.applyMoneyDelta(base.moneyDelta);
+        return new ChoiceEffect(base.healthDelta, base.stressDelta, money, base.ageDelta, base.nextStatus);
     }
 
     public SaveData toSaveData() {
@@ -99,6 +123,12 @@ class GameModel {
         data.achievements = new LinkedHashSet<>(achievements);
         data.config = config;
         data.tagCounts = player.getTagCounts();
+        data.lastEventTitle = player.getLastEventTitle();
+        data.statPoints = player.getStatPoints();
+        data.npcs = player.getNpcs();
+        data.economy = economy;
+        data.location = player.getLocation();
+        data.chapter = player.getChapter();
         data.savedAt = System.currentTimeMillis();
         return data;
     }
@@ -108,7 +138,7 @@ class GameModel {
     }
 
     public DeathResult applyChoice(Choice choice, String eventTitle) {
-        ChoiceEffect effect = difficulty.apply(choice);
+        ChoiceEffect effect = getEffectiveEffect(choice);
 
         if (effect.nextStatus != null) {
             player.setStatus(effect.nextStatus);
@@ -125,6 +155,7 @@ class GameModel {
             ChoiceEffect appliedEffect = effect.withAgeDelta(0);
             stats.record(appliedEffect, player);
             updateAchievements();
+            player.recordStatPoint();
             String reason = (player.getHealth() <= 0) ? "病死・衰弱死" : "ストレス死";
             return new DeathResult(
                     DeathResult.Type.DEAD,
@@ -134,11 +165,47 @@ class GameModel {
         }
 
         player.incrementAge(effect.ageDelta);
+        economy.advanceYears(effect.ageDelta);
+        player.recordStatPoint();
 
         stats.record(effect, player);
         recordStateTags();
         updateAchievements();
 
+        return new DeathResult(DeathResult.Type.ALIVE, "", "", player.getAge());
+    }
+
+    public DeathResult applyCustomEffect(String eventTitle, String choiceText, ChoiceEffect effect) {
+        if (effect.nextStatus != null) {
+            player.setStatus(effect.nextStatus);
+        }
+
+        player.addHistory(eventTitle, choiceText);
+        recordTags(eventTitle, choiceText);
+        player.changeHealth(effect.healthDelta);
+        player.changeStress(effect.stressDelta);
+        player.changeMoney(effect.moneyDelta);
+        player.checkVitality();
+
+        if (!player.isAlive()) {
+            ChoiceEffect appliedEffect = effect.withAgeDelta(0);
+            stats.record(appliedEffect, player);
+            updateAchievements();
+            player.recordStatPoint();
+            String reason = (player.getHealth() <= 0) ? "病死・衰弱死" : "ストレス死";
+            return new DeathResult(
+                    DeathResult.Type.DEAD,
+                    reason,
+                    "志半ばで力尽きました...",
+                    player.getAge());
+        }
+
+        player.incrementAge(effect.ageDelta);
+        economy.advanceYears(effect.ageDelta);
+        player.recordStatPoint();
+        stats.record(effect, player);
+        recordStateTags();
+        updateAchievements();
         return new DeathResult(DeathResult.Type.ALIVE, "", "", player.getAge());
     }
 
@@ -160,12 +227,21 @@ class GameModel {
                 endingTitle = "大往生";
                 endingMessage = "長い人生を全うし、静かに幕を下ろしました。";
             }
+        } else if (player.getMoney() >= 100000000) {
+            endingTitle = "セレブエンド";
+            endingMessage = "桁違いの資産を築き、別世界の人生を歩みました。";
+        } else if ("無職".equals(player.getStatus()) && player.getAge() >= 40) {
+            endingTitle = "無職エンド";
+            endingMessage = "流れのままに時間が過ぎ、人生の再起は果たせませんでした。";
         } else if (player.getMoney() <= -10000000) {
             endingTitle = "借金地獄エンド";
             endingMessage = "返しきれない借金に追われ、人生は崩壊しました。";
         } else if ("社長".equals(player.getStatus()) && player.getMoney() >= 5000000) {
             endingTitle = "起業成功エンド";
             endingMessage = "苦難の末に事業を軌道に乗せ、成功を掴みました。";
+        } else if (player.getStress() >= 90 && player.getAge() >= 50) {
+            endingTitle = "社畜エンド";
+            endingMessage = "仕事に人生を捧げ、心身が限界に達しました。";
         } else if (player.getStress() >= 100) {
             endingTitle = "ストレス死";
             endingMessage = "積み重なったストレスに心身が耐えられませんでした。";
@@ -289,6 +365,7 @@ class GameModel {
         }
         if (containsAny(text, "恋愛", "合コン", "同窓会", "文化祭", "後夜祭")) {
             player.addTag("social");
+            player.bumpNpc("恋人", 2, text);
         }
         if (containsAny(text, "投資", "株", "資産", "ボーナス")) {
             player.addTag("invest");
@@ -301,6 +378,9 @@ class GameModel {
         }
         if (containsAny(text, "セーブ", "ロード")) {
             player.addTag("save_or_load");
+        }
+        if (containsAny(text, "友達", "サークル", "同窓会", "合コン", "クラス")) {
+            player.bumpNpc("友人", 1, text);
         }
     }
 
