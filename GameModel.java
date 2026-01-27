@@ -41,6 +41,9 @@ class GameModel {
             if (data.history != null) {
                 player.setHistory(data.history);
             }
+            if (data.tagCounts != null) {
+                player.setTagCounts(data.tagCounts);
+            }
         }
 
         if (data != null && data.config != null) {
@@ -95,6 +98,7 @@ class GameModel {
         data.stats = stats;
         data.achievements = new LinkedHashSet<>(achievements);
         data.config = config;
+        data.tagCounts = player.getTagCounts();
         data.savedAt = System.currentTimeMillis();
         return data;
     }
@@ -111,6 +115,7 @@ class GameModel {
         }
 
         player.addHistory(eventTitle, choice.text);
+        recordTags(eventTitle, choice.text);
         player.changeHealth(effect.healthDelta);
         player.changeStress(effect.stressDelta);
         player.changeMoney(effect.moneyDelta);
@@ -131,6 +136,7 @@ class GameModel {
         player.incrementAge(effect.ageDelta);
 
         stats.record(effect, player);
+        recordStateTags();
         updateAchievements();
 
         return new DeathResult(DeathResult.Type.ALIVE, "", "", player.getAge());
@@ -174,6 +180,11 @@ class GameModel {
         return new FinalResult(endingTitle, endingMessage, honorTitle, ordered, stats, difficulty);
     }
 
+    public void recordSaveLoad() {
+        player.addTag("save_or_load");
+        updateAchievements();
+    }
+
     private void updateAchievements() {
         if (player.getAge() >= 80) {
             achievements.add(Achievement.LONG_LIFE);
@@ -205,6 +216,39 @@ class GameModel {
         if (stats.getTotalChoices() >= 50) {
             achievements.add(Achievement.WORKAHOLIC);
         }
+        if (player.getAge() < 20 && !player.isAlive()) {
+            achievements.add(Achievement.SPEED_RUN);
+        }
+        if (player.getAge() >= 60 && "社長".equals(player.getStatus())) {
+            achievements.add(Achievement.LATE_BLOOMER);
+        }
+        if (player.getAge() >= 40 && player.getStress() <= 20) {
+            achievements.add(Achievement.STRESS_FREE);
+        }
+        if (player.getMoney() < 0 && player.getAge() >= 100) {
+            achievements.add(Achievement.HEART_OF_GOLD);
+        }
+        if (player.countTag("stress_survive") >= 20) {
+            achievements.add(Achievement.BOUNCY);
+        }
+        if (player.countTag("health") >= 10) {
+            achievements.add(Achievement.HEALTH_FANATIC);
+        }
+        if (player.countTag("social") >= 10) {
+            achievements.add(Achievement.SOCIAL_BUTTERFLY);
+        }
+        if (player.countTag("debt_event") >= 1 && player.isAlive()) {
+            achievements.add(Achievement.SURVIVED_DEBT);
+        }
+        if (player.countTag("save_or_load") >= 1) {
+            achievements.add(Achievement.RESTARTER);
+        }
+        if (player.countTag("invest") >= 5) {
+            achievements.add(Achievement.INVESTOR);
+        }
+        if (player.countTag("family") >= 8) {
+            achievements.add(Achievement.FAMILY_FIRST);
+        }
     }
 
     private String computeHonorTitle() {
@@ -226,6 +270,52 @@ class GameModel {
         if (achievements.contains(Achievement.NEET)) {
             return "無職マスター";
         }
+        if (achievements.contains(Achievement.SOCIAL_BUTTERFLY)) {
+            return "社交界の華";
+        }
+        if (achievements.contains(Achievement.HEALTH_FANATIC)) {
+            return "健康番長";
+        }
+        if (achievements.contains(Achievement.SURVIVED_DEBT)) {
+            return "逆境の生還者";
+        }
         return "平凡な人生";
+    }
+
+    private void recordTags(String eventTitle, String choiceText) {
+        String text = (eventTitle == null ? "" : eventTitle) + " " + (choiceText == null ? "" : choiceText);
+        if (containsAny(text, "健康", "病院", "人間ドック", "ジム", "散歩", "体操", "寝る", "睡眠")) {
+            player.addTag("health");
+        }
+        if (containsAny(text, "恋愛", "合コン", "同窓会", "文化祭", "後夜祭")) {
+            player.addTag("social");
+        }
+        if (containsAny(text, "投資", "株", "資産", "ボーナス")) {
+            player.addTag("invest");
+        }
+        if (containsAny(text, "家族", "結婚", "子供", "孫", "介護", "家庭")) {
+            player.addTag("family");
+        }
+        if (containsAny(text, "借金", "督促", "闇金", "夜逃げ")) {
+            player.addTag("debt_event");
+        }
+        if (containsAny(text, "セーブ", "ロード")) {
+            player.addTag("save_or_load");
+        }
+    }
+
+    private void recordStateTags() {
+        if (player.getStress() >= 50 && player.isAlive()) {
+            player.addTag("stress_survive");
+        }
+    }
+
+    private boolean containsAny(String text, String... keys) {
+        for (String k : keys) {
+            if (text.contains(k)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

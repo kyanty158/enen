@@ -1,6 +1,8 @@
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 class Player {
@@ -15,6 +17,7 @@ class Player {
     private String status; // 現在の身分（学生、社会人、ニートなど）
     private List<String> history;
     private Set<String> seenEvents;
+    private Map<String, Integer> pickedTags;
 
     public Player() {
         this("プレイヤー", 0, 100, 0, 0, "幼児");
@@ -30,6 +33,7 @@ class Player {
         this.status = status; // 初期ステータス
         this.history = new ArrayList<>();
         this.seenEvents = new HashSet<>();
+        this.pickedTags = new HashMap<>();
     }
 
     public void addHistory(String eventTitle, String choiceText) {
@@ -45,6 +49,31 @@ class Player {
     public void setHistory(List<String> history) {
         this.history = new ArrayList<>(history);
         rebuildSeenEvents();
+    }
+
+    public void addTag(String tag) {
+        if (tag != null) {
+            pickedTags.put(tag, pickedTags.getOrDefault(tag, 0) + 1);
+        }
+    }
+
+    public int countTag(String tag) {
+        return pickedTags.getOrDefault(tag, 0);
+    }
+
+    public boolean hasTag(String tag) {
+        return pickedTags.containsKey(tag);
+    }
+
+    public Map<String, Integer> getTagCounts() {
+        return new HashMap<>(pickedTags);
+    }
+
+    public void setTagCounts(Map<String, Integer> counts) {
+        pickedTags.clear();
+        if (counts != null) {
+            pickedTags.putAll(counts);
+        }
     }
 
     public boolean hasSeenEvent(String title) {
