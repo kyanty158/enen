@@ -3,9 +3,35 @@ import java.awt.*;
 import java.util.function.Consumer;
 
 class TitleView extends JFrame {
-    private final Color BG_COLOR = new Color(25, 28, 35);
     private final Color ACCENT_COLOR = new Color(97, 175, 239);
     private final Color GOLD_COLOR = new Color(255, 215, 0);
+    private final Color PANEL_COLOR = new Color(20, 24, 30);
+
+    private static class GradientPanel extends JPanel {
+        private final Color top = new Color(20, 24, 34);
+        private final Color bottom = new Color(12, 14, 20);
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            int w = getWidth();
+            int h = getHeight();
+            GradientPaint gp = new GradientPaint(0, 0, top, 0, h, bottom);
+            g2.setPaint(gp);
+            g2.fillRect(0, 0, w, h);
+
+            g2.setComposite(AlphaComposite.SrcOver.derive(0.12f));
+            g2.setColor(new Color(97, 175, 239));
+            g2.fillOval((int) (w * 0.6), (int) (h * -0.1), (int) (w * 0.6), (int) (w * 0.6));
+            g2.setColor(new Color(255, 215, 0));
+            g2.fillOval((int) (w * -0.2), (int) (h * 0.55), (int) (w * 0.5), (int) (w * 0.5));
+            g2.dispose();
+        }
+    }
 
     private static class StatusOption {
         final String label;
@@ -24,22 +50,23 @@ class TitleView extends JFrame {
         setSize(520, 760);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
-        getContentPane().setBackground(BG_COLOR);
+        setContentPane(new GradientPanel());
+        getContentPane().setLayout(new BorderLayout());
 
         // メインパネル
         JPanel mainPanel = new JPanel();
         mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
-        mainPanel.setBackground(BG_COLOR);
+        mainPanel.setOpaque(false);
         mainPanel.setBorder(BorderFactory.createEmptyBorder(40, 40, 40, 40));
 
         // タイトルラベル
         JLabel titleLabel = new JLabel("人生100年");
-        titleLabel.setFont(new Font("SansSerif", Font.BOLD, 48));
+        titleLabel.setFont(new Font("Serif", Font.BOLD, 54));
         titleLabel.setForeground(GOLD_COLOR);
         titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         JLabel subtitleLabel = new JLabel("サバイバル");
-        subtitleLabel.setFont(new Font("SansSerif", Font.BOLD, 42));
+        subtitleLabel.setFont(new Font("SansSerif", Font.BOLD, 40));
         subtitleLabel.setForeground(ACCENT_COLOR);
         subtitleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
@@ -49,29 +76,42 @@ class TitleView extends JFrame {
         catchLabel.setForeground(Color.LIGHT_GRAY);
         catchLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        // バージョン情報
-        JLabel versionLabel = new JLabel("フルカスタム版 v3.0");
-        versionLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        versionLabel.setForeground(Color.GRAY);
-        versionLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        JPanel headerPanel = new JPanel();
+        headerPanel.setLayout(new BoxLayout(headerPanel, BoxLayout.Y_AXIS));
+        headerPanel.setOpaque(false);
+
+        JPanel accentBar = new JPanel();
+        accentBar.setBackground(ACCENT_COLOR);
+        accentBar.setMaximumSize(new Dimension(120, 4));
+        accentBar.setPreferredSize(new Dimension(120, 4));
+        accentBar.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         // 設定パネル
         JPanel formPanel = new JPanel(new GridBagLayout());
-        formPanel.setBackground(BG_COLOR);
+        formPanel.setBackground(PANEL_COLOR);
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(6, 0, 6, 0);
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.gridx = 0;
         gbc.gridy = 0;
 
+        formPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(80, 85, 95)),
+                BorderFactory.createEmptyBorder(16, 16, 16, 16)));
+
         JLabel nameLabel = new JLabel("名前");
         nameLabel.setForeground(Color.LIGHT_GRAY);
         JTextField nameField = new JTextField("プレイヤー", 14);
+        nameField.setBackground(new Color(30, 34, 40));
+        nameField.setForeground(Color.WHITE);
+        nameField.setCaretColor(Color.WHITE);
 
         JLabel diffLabel = new JLabel("難易度");
         diffLabel.setForeground(Color.LIGHT_GRAY);
         JComboBox<Difficulty> diffBox = new JComboBox<>(Difficulty.values());
         diffBox.setSelectedItem(Difficulty.NORMAL);
+        diffBox.setBackground(new Color(30, 34, 40));
+        diffBox.setForeground(Color.WHITE);
 
         StatusOption[] options = new StatusOption[] {
                 new StatusOption("幼児 (0歳)", "幼児", 0),
@@ -90,6 +130,8 @@ class TitleView extends JFrame {
             statusLabels[i] = options[i].label;
         }
         JComboBox<String> statusBox = new JComboBox<>(statusLabels);
+        statusBox.setBackground(new Color(30, 34, 40));
+        statusBox.setForeground(Color.WHITE);
 
         gbc.gridx = 0;
         gbc.gridy = 0;
@@ -174,39 +216,17 @@ class TitleView extends JFrame {
             new EndingsView();
         });
 
-        // 説明テキスト
-        JTextArea descArea = new JTextArea(
-                "【ルール】\n" +
-                        "・0歳から100歳を目指して生き抜け！\n" +
-                        "・体力が0になると死亡\n" +
-                        "・ストレスが100になると死亡\n" +
-                        "・難易度/初期ステータスで人生が変化" +
-                        "\n\n【新機能】\n" +
-                        "・セーブ/ロード\n" +
-                        "・履歴ログ閲覧\n" +
-                        "・実績＆称号＆統計\n" +
-                        "・選択結果の演出");
-        descArea.setFont(new Font("SansSerif", Font.PLAIN, 14));
-        descArea.setForeground(Color.LIGHT_GRAY);
-        descArea.setBackground(new Color(35, 38, 45));
-        descArea.setEditable(false);
-        descArea.setLineWrap(true);
-        descArea.setWrapStyleWord(true);
-        descArea.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(Color.GRAY),
-                BorderFactory.createEmptyBorder(12, 12, 12, 12)));
-        descArea.setMaximumSize(new Dimension(420, 200));
-        descArea.setAlignmentX(Component.CENTER_ALIGNMENT);
-
         // 配置
+        headerPanel.add(titleLabel);
+        headerPanel.add(Box.createVerticalStrut(6));
+        headerPanel.add(subtitleLabel);
+        headerPanel.add(Box.createVerticalStrut(12));
+        headerPanel.add(accentBar);
+        headerPanel.add(Box.createVerticalStrut(10));
+        headerPanel.add(catchLabel);
+
         mainPanel.add(Box.createVerticalGlue());
-        mainPanel.add(titleLabel);
-        mainPanel.add(Box.createVerticalStrut(5));
-        mainPanel.add(subtitleLabel);
-        mainPanel.add(Box.createVerticalStrut(10));
-        mainPanel.add(catchLabel);
-        mainPanel.add(Box.createVerticalStrut(5));
-        mainPanel.add(versionLabel);
+        mainPanel.add(headerPanel);
         mainPanel.add(Box.createVerticalStrut(20));
         mainPanel.add(formPanel);
         mainPanel.add(Box.createVerticalStrut(20));
@@ -215,8 +235,6 @@ class TitleView extends JFrame {
         mainPanel.add(loadButton);
         mainPanel.add(Box.createVerticalStrut(8));
         mainPanel.add(endingsButton);
-        mainPanel.add(Box.createVerticalStrut(20));
-        mainPanel.add(descArea);
         mainPanel.add(Box.createVerticalGlue());
 
         add(mainPanel, BorderLayout.CENTER);
