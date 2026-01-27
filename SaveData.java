@@ -1,5 +1,6 @@
 import java.io.Serializable;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 class SaveData implements Serializable {
@@ -17,5 +18,6 @@ class SaveData implements Serializable {
     public GameStats stats;
     public Set<Achievement> achievements;
     public GameConfig config;
+    public Map<String, Integer> tagCounts;
     public long savedAt;
 }

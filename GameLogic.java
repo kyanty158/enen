@@ -44,6 +44,16 @@ class GameLogic {
         }
 
         // ==============================================
+        // ステータス分岐イベント（中確率で発生）
+        // ==============================================
+        if (age >= 18 && dice < 0.25) {
+            LifeEvent statusEvent = getStatusEvent(player);
+            if (statusEvent != null) {
+                return statusEvent;
+            }
+        }
+
+        // ==============================================
         // 100歳: 寿命
         // ==============================================
         if (age >= 100) {
@@ -424,6 +434,84 @@ class GameLogic {
         List<LifeEvent> target = unseen.isEmpty() ? pool : unseen;
         int index = (int) Math.floor(random() * target.size());
         return target.get(Math.max(0, Math.min(index, target.size() - 1)));
+    }
+
+    private LifeEvent getStatusEvent(Player player) {
+        String status = player.getStatus();
+        int age = player.getAge();
+        long money = player.getMoney();
+
+        List<LifeEvent> pool = new ArrayList<>();
+        LifeEvent event;
+
+        if ("社長".equals(status)) {
+            event = new LifeEvent("【経営】会社の資金繰りが厳しいです。");
+            event.addChoice("追加融資を受ける", -10, 20, 2000000, 1);
+            event.addChoice("固定費を削る", 0, 10, 500000, 1);
+            pool.add(event);
+
+            event = new LifeEvent("【採用】優秀な人材が応募してきました。");
+            event.addChoice("好待遇で即採用", 0, 10, -1000000, 1);
+            event.addChoice("慎重に面接する", -2, 5, 0, 1);
+            pool.add(event);
+
+            event = new LifeEvent("【上場】上場の打診が来ました。");
+            event.addChoice("挑戦する", -10, 30, 5000000, 1);
+            event.addChoice("まだ早いと断る", 5, -5, 0, 1);
+            pool.add(event);
+        } else if ("無職".equals(status) || "ニート".equals(status) || "フリーター".equals(status)) {
+            event = new LifeEvent("【再起】職業訓練校の案内が届きました。");
+            event.addChoice("通ってスキルをつける", -5, 10, -20000, 1, "社会人");
+            event.addChoice("スルーする", 5, -5, 0, 1);
+            pool.add(event);
+
+            event = new LifeEvent("【面接】久しぶりの面接で緊張しています。");
+            event.addChoice("正直に話す", -2, 10, 0, 1);
+            event.addChoice("話を盛る", 0, 15, 0, 1);
+            pool.add(event);
+
+            event = new LifeEvent("【日常】生活リズムが崩れてきました。");
+            event.addChoice("早寝早起きに戻す", 5, -5, 0, 1);
+            event.addChoice("夜型を続ける", -5, 5, 0, 1);
+            pool.add(event);
+        } else if ("既婚者".equals(status)) {
+            event = new LifeEvent("【家庭】家族旅行の計画を立てています。");
+            event.addChoice("奮発して温泉旅行", 5, -10, -200000, 1);
+            event.addChoice("日帰りで節約", 2, -3, -50000, 1);
+            pool.add(event);
+
+            event = new LifeEvent("【家計】家計簿を見直す時期です。");
+            event.addChoice("固定費を削減", 0, 5, 100000, 1);
+            event.addChoice("我慢できず散財", -2, 10, -100000, 1);
+            pool.add(event);
+        } else if ("独身".equals(status)) {
+            event = new LifeEvent("【独身】趣味に全力投資したい。");
+            event.addChoice("高額な趣味に挑戦", 0, 10, -300000, 1);
+            event.addChoice("ほどほどに楽しむ", 2, -2, -50000, 1);
+            pool.add(event);
+
+            event = new LifeEvent("【出会い】友人から紹介の話が来ました。");
+            event.addChoice("会ってみる", -2, 10, -20000, 1);
+            event.addChoice("今はいいかな", 2, -2, 0, 1);
+            pool.add(event);
+        } else if ("逃亡者".equals(status)) {
+            event = new LifeEvent("【逃亡】身を隠すために引っ越しが必要です。");
+            event.addChoice("遠くに逃げる", -5, 20, -200000, 1);
+            event.addChoice("地元で潜む", 0, 15, 0, 1);
+            pool.add(event);
+        }
+
+        if (money >= 20000000) {
+            event = new LifeEvent("【資産家】資産運用の見直しを迫られます。");
+            event.addChoice("安全運用に切り替え", 2, -2, 300000, 1);
+            event.addChoice("攻めの投資を続行", -3, 12, 800000, 1);
+            pool.add(event);
+        }
+
+        if (pool.isEmpty()) {
+            return null;
+        }
+        return pickEvent(player, pool);
     }
 
     // 社会人・大人時代のイベントプール（数が多いのでメソッド分離）

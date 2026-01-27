@@ -48,6 +48,7 @@ class GameController implements ActionListener {
 
         if ("SAVE".equals(command)) {
             boolean ok = SaveManager.save(model.toSaveData());
+            model.recordSaveLoad();
             view.showSystemMessage(ok ? "セーブしました。" : "セーブに失敗しました。");
             return;
         }
@@ -59,6 +60,7 @@ class GameController implements ActionListener {
                 return;
             }
             model = new GameModel(data);
+            model.recordSaveLoad();
             view.updateMeta(model.getPlayer(), model.getDifficulty());
             nextTurn();
             view.showSystemMessage("ロードしました。");
