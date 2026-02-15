@@ -1,0 +1,413 @@
+\documentclass[a4paper,11pt]{jsarticle}
+\usepackage[dvipdfmx]{graphicx}
+\usepackage{listings, jlisting} % コード掲載用
+\usepackage{xcolor}             % 色付け用
+\usepackage{url}
+
+% ソースコードのスタイル設定
+\lstset{
+  language=Java,
+  basicstyle=\ttfamily\small,
+  commentstyle=\color{green!50!black},
+  keywordstyle=\bfseries\color{blue},
+  stringstyle=\color{red!60!black},
+  frame=tb,
+  numbers=left,
+  numberstyle=\tiny,
+  stepnumber=1,
+  tabsize=4,
+  breaklines=true,
+  captionpos=b,
+  xleftmargin=2em,
+  xrightmargin=2em
+}
+
+\title{人生ロングラン・ノベルゲーム\\Model層 実装報告書}
+\author{担当：志熊 陽斗}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{はじめに}
+本レポートでは、Javaを用いた「人生ロングラン・ノベルゲーム（Infinite Life Tunnel）」開発において、筆者が担当した\textbf{Model層（データとロジック）}の実装詳細について解説する。
+
+MVCアーキテクチャにおけるModel層の役割は、View（表示）やController（入力制御）から独立し、以下の責務を果たすことである。
+\begin{itemize}
+    \item プレイヤーの状態（年齢、体力、資産など）の管理
+    \item ゲームの進行ルール（イベント分岐、死亡判定）の実行
+    \item データの整合性の保持
+\end{itemize}
+
+本システムでは、複雑なイベント分岐と可変時間システム（選択肢によって経過年数が異なる仕組み）を実現するため、Model層を複数のクラスに分割して設計した。以下に各クラスの詳細を述べる。
+
+\section{Playerクラス（状態管理）}
+\texttt{Player}クラスは、主人公の現在のステータスを保持・管理するクラスである。
+カプセル化の原則に基づき、フィールドはすべて\texttt{private}とし、外部からの不正な書き換えを防ぐ設計としている。
+
+\subsection{ソースコードと解説}
+
+\begin{lstlisting}[caption=Player.java（定数とフィールド定義）, label=code:player_fields]
+class Player {
+    // 定数定義
+    public static final int HUMAN_LIFESPAN = 100;
+
+    // プレイヤーの状態（フィールド）
+    private int age;        // 年齢
+    private int health;     // 体力（0-100）
+    private int stress;     // ストレス（0-100）
+    private long money;     // 所持金（大きな値を扱うためlong）
+    private boolean isAlive;// 生存フラグ
+
+    // コンストラクタ
+    public Player() {
+        this.age = 0;       // 0歳からスタート
+        this.health = 50;   // 乳幼児期は体力が低め
+        this.stress = 0;    // ストレスなし
+        this.money = 0;     // 所持金ゼロ
+        this.isAlive = true;// 生存状態で開始
+    }
+\end{lstlisting}
+
+\subsubsection*{コード解説（フィールド定義）}
+\begin{itemize}
+    \item \textbf{2行目}: \texttt{HUMAN\_LIFESPAN}を定数として定義することで、ゲーム終了条件（100歳）を変更する際に一箇所を修正するだけで済むようにしている。
+    \item \textbf{5-9行目}: 各ステータス変数を\texttt{private}で宣言している。特に\texttt{money}は将来的に数億円規模になる可能性があるため、\texttt{int}ではなく\texttt{long}型を採用した。
+    \item \textbf{12-18行目}: コンストラクタにて初期化を行う。本ゲームは「0歳からの人生」をテーマとしているため、\texttt{age}を0、\texttt{health}を50（成人の半分程度）として、リアリティを持たせている。
+\end{itemize}
+
+\begin{lstlisting}[caption=Player.java（状態操作メソッド）, label=code:player_methods]
+    // 年齢を加算するメソッド
+    public void incrementAge(int years) {
+        this.age += years;
+    }
+
+    // 体力を増減させるメソッド
+    public void changeHealth(int amount) {
+        this.health += amount;
+        // 上限キャップ処理
+        if (this.health > 100) this.health = 100;
+    }
+
+    // ストレスを増減させるメソッド
+    public void changeStress(int amount) {
+        this.stress += amount;
+        // 下限キャップ処理
+        if (this.stress < 0) this.stress = 0;
+    }
+
+    // 所持金を増減させるメソッド
+    public void changeMoney(long amount) {
+        this.money += amount;
+        // 借金（マイナス）も許容するため、下限チェックは行わない
+    }
+\end{lstlisting}
+
+\subsubsection*{コード解説（状態操作）}
+\begin{itemize}
+    \item \textbf{2-4行目（incrementAge）}: 本ゲームの特徴である「可変時間システム」に対応するため、固定値（$+1$）ではなく、引数\texttt{years}を受け取って加算するように実装している。
+    \item \textbf{7-11行目（changeHealth）}: 体力が100を超えないようにガード処理を入れている。
+    \item \textbf{14-18行目（changeStress）}: ストレスがマイナスにならないように制御している。
+    \item \textbf{21-24行目（changeMoney）}: 住宅ローンなどのイベントを想定し、所持金はマイナス（借金状態）になれる仕様とした。
+\end{itemize}
+
+\begin{lstlisting}[caption=Player.java（生死判定とゲッター）, label=code:player_check]
+    // 死亡判定を行うメソッド
+    public void checkVitality() {
+        if (this.health <= 0 || this.stress >= 100) {
+            this.isAlive = false;
+        }
+    }
+
+    // 各フィールドの値を取得するゲッター
+    public int getAge() { return age; }
+    public boolean isAlive() { return isAlive; }
+    public int getHealth() { return health; }
+    public int getStress() { return stress; }
+    public long getMoney() { return money; }
+}
+\end{lstlisting}
+
+\subsubsection*{コード解説（生死判定）}
+\begin{itemize}
+    \item \textbf{2-6行目（checkVitality）}: ゲームオーバー条件を判定する重要なメソッドである。
+    \begin{itemize}
+        \item \texttt{health <= 0}: 体力が尽きた場合（過労死、病死など）。
+        \item \texttt{stress >= 100}: ストレスが限界を超えた場合（精神的崩壊）。
+    \end{itemize}
+    このメソッドはイベント選択ごとにController経由で呼び出され、生存フラグ\texttt{isAlive}を更新する。
+    \item \textbf{9-13行目}: View層が画面表示を行うために、現在の値を読み取るだけのメソッド（ゲッター）を提供している。
+\end{itemize}
+
+% 第1部終了
+
+% --- 第2部ここから ---
+
+\section{データ構造（Choiceクラス・LifeEventクラス）}
+本ゲームはノベルゲーム形式であり、イベント（LifeEvent）とそれに紐づく選択肢（Choice）のデータ構造がシステムの根幹を成している。
+Model層では、これらのデータをオブジェクト指向の考え方に基づき、独立したクラスとして定義した。
+
+
+
+\subsection{Choiceクラス（選択肢データ）}
+\texttt{Choice}クラスは、プレイヤーが選択可能な「一つの行動」を表すクラスである。
+単なるテキストデータだけでなく、その選択を選んだ結果として発生するステータス変動値や、経過時間を保持している。
+
+\begin{lstlisting}[caption=Choice.java, label=code:choice]
+class Choice {
+    public String text;      // 選択肢の文言
+    public int healthDelta;  // 体力増減値
+    public int stressDelta;  // ストレス増減値
+    public long moneyDelta;  // 所持金増減値
+    public int ageDelta;     // 経過年数（可変時間システムの核）
+
+    // コンストラクタ
+    public Choice(String text, int h, int s, long m, int ageDelta) {
+        this.text = text;
+        this.healthDelta = h;
+        this.stressDelta = s;
+        this.moneyDelta = m;
+        this.ageDelta = ageDelta;
+    }
+    
+    // UI表示用にテキストを整形するメソッド
+    public String getText() {
+        return text + " (+" + ageDelta + "年)";
+    }
+}
+\end{lstlisting}
+
+\subsubsection*{コード解説}
+\begin{itemize}
+    \item \textbf{2-6行目（フィールド定義）}: 各フィールドは、その選択肢を選んだ時の「変化量（Delta）」を表す。
+    \begin{itemize}
+        \item \textbf{\texttt{ageDelta}}: 本システムの最重要フィールドである。従来のすごろく型ゲームのように「1ターン＝1年」と固定するのではなく、選択肢ごとに「大学進学＝4年」「就職＝1年」「短期バイト＝0年（数ヶ月）」といった異なる時間を設定することを可能にしている。
+    \end{itemize}
+    \item \textbf{18-20行目（getTextメソッド）}: View層がボタンを描画する際、プレイヤーに「この選択で何年経過するか」を明示するために、テキストを加工して返すメソッドを用意した。
+\end{itemize}
+
+\subsection{LifeEventクラス（イベントコンテナ）}
+\texttt{LifeEvent}クラスは、ゲーム内の一つの場面（シーン）を表すクラスである。
+一つのイベントタイトルに対し、複数の\texttt{Choice}オブジェクトをリスト構造で保持する「1対多」の関係を持っている。
+
+\begin{lstlisting}[caption=LifeEvent.java, label=code:lifeevent]
+import java.util.ArrayList;
+import java.util.List;
+
+class LifeEvent {
+    private String title;          // イベントのタイトル・本文
+    private List<Choice> choices;  // 選択肢のリスト
+
+    // コンストラクタ
+    public LifeEvent(String title) {
+        this.title = title;
+        this.choices = new ArrayList<>(); // 空のリストで初期化
+    }
+
+    // 選択肢を追加するメソッド
+    public void addChoice(String text, int h, int s, long m, int ageDelta) {
+        choices.add(new Choice(text, h, s, m, ageDelta));
+    }
+
+    // ゲッターメソッド
+    public String getTitle() { return title; }
+    public String getText() { return title; } // View用
+    public List<Choice> getChoices() { return choices; }
+}
+\end{lstlisting}
+
+\subsubsection*{コード解説}
+\begin{itemize}
+    \item \textbf{5-6行目}: 選択肢を配列（\texttt{Choice[]}）ではなく\texttt{List<Choice>}で管理している。これにより、イベントによって選択肢が2つだったり4つだったりと可変になっても柔軟に対応できる。
+    \item \textbf{14-16行目（addChoice）}: 外部（GameLogic）から選択肢を追加するためのメソッド。内部で\texttt{new Choice(...)}を行うことで、Logic側のコード記述量を減らし、可読性を高めている。
+    \item \textbf{Design Pattern}: この構造は「コンポジットパターン」の簡易版とも言え、イベントと選択肢を階層構造で管理することで、将来的に「選択肢の中にさらにイベントが含まれる」といった拡張も容易になっている。
+\end{itemize}
+
+% --- 第2部終了 ---
+
+% --- 第3部ここから ---
+
+\section{ロジック（GameLogicクラス）}
+\texttt{GameLogic}クラスは、プレイヤーの状態（年齢）に基づいて、適切なイベントを生成・選択する「ビジネスロジック」を担当するクラスである。
+条件分岐（if-else, switch）と乱数（Math.random）を組み合わせることで、直線的ではない多様な人生シナリオを実現している。
+
+\begin{lstlisting}[caption=GameLogic.java（イベント振り分け）, label=code:gamelogic_main]
+class GameLogic {
+
+    // メインのイベント振り分けメソッド
+    public LifeEvent getEventForAge(int age) {
+        if (age < 23) {
+            return getChildhoodEvent(age);
+        } else if (age < 65) {
+            return getAdultEvent(age);
+        } else if (age < 100) {
+            return getSeniorEvent(age);
+        } else {
+            return getEndingEvent();
+        }
+    }
+\end{lstlisting}
+
+\subsubsection*{コード解説（イベント振り分け）}
+\begin{itemize}
+    \item \textbf{4-12行目}: 年齢に応じて呼び出すメソッドを切り替える「ファサード（窓口）」の役割を果たしている。
+    \begin{itemize}
+        \item \textbf{0-22歳}: \texttt{getChildhoodEvent}（子供・学生時代）
+        \item \textbf{23-64歳}: \texttt{getAdultEvent}（社会人時代）
+        \item \textbf{65-99歳}: \texttt{getSeniorEvent}（老後）
+        \item \textbf{100歳以上}: \texttt{getEndingEvent}（エンディング）
+    \end{itemize}
+    このようにメソッドを分割することで、コードの可読性を保ち、将来的なイベント追加（例：青年期の拡張）を容易にしている。
+\end{itemize}
+
+\subsection{各年代のイベント生成ロジック}
+
+\subsubsection{子供・学生時代（特定年齢イベント）}
+0歳から22歳までは、入学・卒業・成人式など年齢特有のイベントが多いため、\texttt{switch}文を用いて年齢ごとに固定のイベントを定義した。
+
+\begin{lstlisting}[caption=GameLogic.java（子供時代）, label=code:gamelogic_child]
+    private LifeEvent getChildhoodEvent(int age) {
+        LifeEvent event = new LifeEvent("イベントエラー");
+
+        switch (age) {
+            case 0:
+                event = new LifeEvent("【0歳】誕生。...");
+                event.addChoice("大声で泣く", 5, 0, 0, 3); // 3歳へ
+                event.addChoice("静かにする", 0, 0, 0, 3);
+                break;
+            case 6: // 小学校入学
+                event = new LifeEvent("【6歳】小学校入学。...");
+                event.addChoice("友達を作る", 5, 5, 0, 2); // 8歳へ
+                // ... 省略 ...
+                break;
+            case 18: // 進路選択
+                event = new LifeEvent("【18歳】進路選択。...");
+                event.addChoice("大学進学", 0, 10, -5000000, 1); // 19歳へ
+                event.addChoice("就職", -5, 30, 2000000, 5);    // 23歳へジャンプ
+                break;
+            // ... 他の年齢 ...
+        }
+        return event;
+    }
+\end{lstlisting}
+
+\subsubsection*{コード解説}
+\begin{itemize}
+    \item \textbf{7, 12, 17行目（経過時間の制御）}: 選択肢の第5引数（\texttt{ageDelta}）により、次に訪れるイベント年齢を制御している。
+    \begin{itemize}
+        \item 0歳の次は3歳（+3年）、6歳の次は8歳（+2年）と細かく設定。
+        \item 18歳の選択肢では、「大学進学」なら1年後の19歳へ進むが、「就職」を選ぶといきなり5年後の23歳（社会人編）へスキップする。これにより人生の分岐を表現している。
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{社会人・老後（ランダムイベント）}
+23歳以降は長い期間が続くため、年齢による固定イベントではなく、乱数を用いた確率的なイベント発生を実装した。
+
+\begin{lstlisting}[caption=GameLogic.java（社会人時代）, label=code:gamelogic_adult]
+    private LifeEvent getAdultEvent(int age) {
+        LifeEvent event;
+        double rnd = Math.random(); // 0.0〜1.0の乱数生成
+
+        if (age < 35) { // 若手時代
+            if (rnd < 0.4) {
+                event = new LifeEvent("【" + age + "歳】仕事のミス...");
+            } else if (rnd < 0.7) {
+                event = new LifeEvent("【" + age + "歳】結婚ラッシュ...");
+            } else {
+                event = new LifeEvent("【" + age + "歳】昇進チャンス！");
+            }
+        } 
+        // ... 中堅・ベテラン時代 ...
+        return event;
+    }
+\end{lstlisting}
+
+\subsubsection*{コード解説}
+\begin{itemize}
+    \item \textbf{3行目}: \texttt{Math.random()}を使用することで、同じ年齢でもプレイするたびに異なるイベントが発生する可能性がある（リプレイ性の確保）。
+    \item \textbf{5行目}: 年齢層（若手・中堅・ベテラン）によって発生するイベントプールを切り替えている。これにより「20代で老後の心配をする」といった不自然な状況を防いでいる。
+\end{itemize}
+
+% --- 第3部終了 ---
+
+% --- 第4部ここから ---
+
+\section{統合とインターフェース（GameModelクラス）}
+\texttt{GameModel}クラスは、前述した\texttt{Player}（状態）と\texttt{GameLogic}（ロジック）を統合し、Controller層に対する「単一の窓口（Facade）」を提供するクラスである。
+
+Controller層は、このクラスのメソッドのみを呼び出すことでゲームを進行させる。これにより、内部の複雑なデータ構造や計算ロジックがController層に漏れ出すことを防いでいる（疎結合の実現）。
+
+\begin{lstlisting}[caption=GameModel.java（主要メソッド）, label=code:gamemodel]
+class GameModel {
+    private final Player player;
+    private final GameLogic logic;
+
+    public GameModel() {
+        this.player = new Player();
+        this.logic = new GameLogic();
+    }
+
+    // 次のイベントを取得する（Logicへ委譲）
+    public LifeEvent nextEvent() {
+        return logic.getEventForAge(player.getAge());
+    }
+
+    // 選択肢の結果を適用する（Controllerから呼ばれる主要メソッド）
+    public DeathResult applyChoice(Choice choice) {
+        // 1. ステータス反映
+        player.changeHealth(choice.healthDelta);
+        player.changeStress(choice.stressDelta);
+        player.changeMoney(choice.moneyDelta);
+        
+        // 2. 死亡判定
+        player.checkVitality();
+        if (!player.isAlive()) {
+            return new DeathResult(DeathResult.Type.DEAD, "過労死...", "...", player.getAge());
+        }
+
+        // 3. 年齢加算（可変時間システム）
+        player.incrementAge(choice.ageDelta);
+
+        // 4. クリア判定（100歳到達）
+        if (player.getAge() >= Player.HUMAN_LIFESPAN) {
+             return new DeathResult(DeathResult.Type.DEAD, "大往生", "...", player.getAge());
+        }
+
+        // 5. 生存継続
+        return new DeathResult(DeathResult.Type.ALIVE, "", "", player.getAge());
+    }
+}
+\end{lstlisting}
+
+\subsubsection*{コード解説}
+\begin{itemize}
+    \item \textbf{11-13行目（nextEvent）}: どのイベントを出すかの判断を\texttt{GameLogic}に完全に委譲（Delegate）している。Controllerは「次のイベントをくれ」と言うだけでよく、年齢による分岐ロジックを知る必要がない。
+    \item \textbf{16-37行目（applyChoice）}: ゲームの1ターンの処理をカプセル化したメソッドである。
+    \begin{enumerate}
+        \item \textbf{ステータス更新}: 選択肢の効果をPlayerに反映させる。
+        \item \textbf{死亡チェック}: 更新後の値で生存確認を行う。
+        \item \textbf{時間経過}: 生きていれば年齢を進める。
+        \item \textbf{クリアチェック}: 寿命（100歳）に達したかを確認する。
+    \end{enumerate}
+    この一連の流れを一つのメソッド内に隠蔽することで、処理順序の間違い（例：死亡しているのに年齢が増えるなど）を防いでいる。
+    \item \textbf{戻り値（DeathResult）}: 処理結果（生存か死亡か）を独自のデータクラス\texttt{DeathResult}に詰めて返すことで、Controller側での分岐処理を簡潔にしている。
+\end{itemize}
+
+\section{まとめ}
+本開発において、Model層の実装を担当した。
+特に注力したのは、以下の2点である。
+
+\begin{enumerate}
+    \item \textbf{可変時間システムの実現}:
+    \texttt{Choice}クラスに\texttt{ageDelta}フィールドを持たせ、選択肢によって「1年進む」「5年進む」といった柔軟な時間経過を可能にした。これにより、大学進学や就職といった人生の分岐点をリアルに表現できた。
+    
+    \item \textbf{責務の明確な分離}:
+    状態管理（\texttt{Player}）、データ定義（\texttt{LifeEvent/Choice}）、分岐ロジック（\texttt{GameLogic}）、外部窓口（\texttt{GameModel}）とクラスを役割ごとに分割した。
+    この設計により、例えば「イベントを増やしたい」場合は\texttt{GameLogic}のみを修正すればよく、他のクラスへの影響を最小限に抑えることができる。
+\end{enumerate}
+
+MVCアーキテクチャのModel層として、堅牢かつ拡張性の高い実装を行えたと考える。
+
+\end{document}
+% --- 第4部終了 ---
