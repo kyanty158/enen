@@ -316,7 +316,47 @@ class GameModel {
 \begin{flushright}
 文責：佐藤 〇〇
 \end{flushright}
-（※ここに佐藤さんの担当箇所の説明が入ります。Swingコンポーネントの配置や、イベント内容のテキストエリア表示などの工夫点について記述されます。）
+
+View層は、ユーザーへの情報の提示と操作の受け付けを担当する部分である。
+Java標準のGUIツールキットであるSwingを使用し、リッチなグラフィカルインターフェースを構築した。
+主なクラスとして、タイトル画面を管理する\texttt{TitleView}、メインゲーム画面の\texttt{GameView}、結果表示の\texttt{ResultView}を作成した。
+
+\subsubsection{GameViewクラス（メイン画面）}
+ゲームの進行状況やイベントを表示する主要な画面である。
+画面構成は上から順に、現在のステータスを表示するヘッダーパネル、イベントテキストと結果ログを表示するセンターパネル、そして選択肢ボタンを配置するフッターパネルの3部構成となっている。
+
+\textbf{工夫した点：}
+\begin{itemize}
+    \item \textbf{視覚的なフィードバック}: ステータス（体力・ストレス・所持金）が増減した際、数値の変化だけでなく、\texttt{javax.swing.Timer}を利用してプログレスバーやラベルの色を一瞬変化させるアニメーション処理を実装した。これにより、プレイヤーは直感的に「ダメージを受けた」「回復した」といった変化を感じ取ることができる。
+    \item \textbf{HTMLによるリッチテキスト表示}: \texttt{JButton}や\texttt{JLabel}はHTMLタグを解釈できる機能を持っている。これを利用し、選択肢ボタンの中に太字の行動内容と、小さく色を変えた補足情報（「(+3年)」など）を併記することで、情報量を増やしつつ見やすさを維持した。
+\end{itemize}
+
+\begin{lstlisting}[caption=GameView.java（視覚効果の実装）, label=code:view_flash]
+    // ステータス変化時にバーを一瞬点滅させるメソッド
+    private void flashBar(JProgressBar bar, Color flashColor) {
+        Color original = bar.getForeground();
+        bar.setForeground(flashColor);
+        // 200ミリ秒後に元の色に戻すタイマーを作成
+        Timer timer = new Timer(200, e -> bar.setForeground(original));
+        timer.setRepeats(false); // 1回だけ実行
+        timer.start();
+    }
+
+    // 選択肢ボタンのテキスト生成（HTML使用）
+    private String formatChoiceText(Choice choice, ChoiceEffect effect) {
+        // ... (省略) ...
+        return "<html><b>" + escapeHtml(choice.getText()) + "</b><br>" +
+               "<span style='color:#888888; font-size:10px;'>" +
+               escapeHtml(effectText) + "</span></html>";
+    }
+\end{lstlisting}
+
+\subsubsection{TitleView / ResultView（画面遷移）}
+ゲームの開始と終了を担当する画面である。
+\texttt{TitleView}では、難易度設定やプレイヤー名の入力フォームを作成した。
+\texttt{ResultView}では、ゲーム終了時の詳細なリザルトを表示する。ここでは\texttt{JScrollPane}を使用し、長いプレイ履歴でもスクロールして全て確認できるようにした。
+
+また、全体を通して配色には「Dark Mode」を意識した暗めの背景色（\texttt{\#282C34}など）を採用し、長時間プレイしても目が疲れにくいモダンなデザインを目指した。
 
 \subsection{Controller層（制御フロー）}
 \begin{flushright}
