@@ -1,0 +1,1015 @@
+% !TeX encoding = UTF-8
+% !TeX program = platex
+\documentclass[a4paper,11pt]{jsarticle}
+\usepackage[dvipdfmx]{graphicx}
+\usepackage{listings, jlisting}
+\usepackage{xcolor}
+\usepackage{url}
+\usepackage{here}
+\usepackage{comment}
+
+
+% ソースコードのスタイル設定
+\lstset{
+  language=Java,
+  basicstyle=\ttfamily\small,
+  commentstyle=\color{green!50!black},
+  keywordstyle=\bfseries\color{blue},
+  stringstyle=\color{red!60!black},
+  frame=tb,
+  numbers=left,
+  numberstyle=\tiny,
+  stepnumber=1,
+  tabsize=4,
+  breaklines=true,
+  captionpos=b,
+  xleftmargin=2em,
+  xrightmargin=2em
+}
+
+\title{メディア情報学プログラミング演習\\最終レポート\\人生１００年サバイバル}
+\author{
+  学籍番号：2411610 氏名：志熊 陽斗 （Model担当）\\
+  学籍番号：xxxxxxx 氏名：北村 〇〇 （Controller担当）\\
+  学籍番号：xxxxxxx 氏名：佐藤 〇〇 （View担当）
+}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\newpage
+
+\section{概要説明}
+\subsection{実現したプログラムの目的と機能}
+本グループでは、0歳から100歳までの人生をシミュレーションするノベルゲームを作成した。
+プレイヤーは主人公となり、幼少期、学生時代、社会人、老後といった人生の各ステージで提示される選択肢を選びながら、１００歳まで生きる人生を目指す。
+
+主な機能は以下の通りである。
+\begin{itemize}
+    \item \textbf{年齢進行システム}: 0歳からスタートし、選択肢に応じて時間が経過する。
+    \item \textbf{ステータス管理}: 「体力」「ストレス」「所持金」のパラメータを管理し、これらが限界を超えるとゲームオーバー（過労死・破産など）となる。
+    \item \textbf{可変時間システム}: 選択肢によって経過する年数が異なる（例：大学進学＝4年経過、就職＝1年経過）。これによりリアルな人生設計が可能となっている。
+    \item \textbf{ライフイベント分岐}: 年齢や乱数に応じて、多彩なイベント（結婚、昇進、病気など）が発生する。
+\end{itemize}
+
+\subsection{作業の分担}
+本プロジェクトはMVC（Model-View-Controller）アーキテクチャを採用し、以下のように役割分担を行って開発を進めた。
+
+\begin{table}[h]
+\centering
+\caption{メンバーの役割分担}
+\begin{tabular}{|l|l|l|}
+\hline
+担当 & 氏名 & 主な作業内容 \\ \hline
+Model & 志熊 陽斗 & データ構造設計、ゲームロジック実装、イベントデータ作成 \\ \hline
+View & 佐藤 〇〇 & GUI画面（Swing）の作成、画面描画処理 \\ \hline
+Controller & 北村 〇〇 & メインループ制御、イベントリスナー実装、ModelとViewの連携 \\ \hline
+\end{tabular}
+\end{table}
+
+\section{設計方針}
+\subsection{基本構想とアルゴリズム}
+本プログラムは、ユーザの選択がステータスと未来のイベントに影響を与える状態遷移型のシミュレーションゲームとして設計した。
+
+最も特徴的なアルゴリズムは可変時間ステップである。選択肢を選んだとき、すべての選択肢で経過時間を等しくするのではなく、選択した行動の重みに応じて経過時間を動的に変化させるデータ構造を採用した。
+
+\subsection{クラス構成（MVCモデル）}
+Javaのオブジェクト指向特性を活かし、機能ごとにクラスを分割するMVCモデルを採用した。
+以下に主要なクラス構成図を示す。
+
+\begin{figure}[H]
+\centering
+% ここにクラス図の画像を挿入します。
+\begin{verbatim}
+[クラス図概略]
++----------------+          +-----------------+          +----------------+
+|      View      | <------- |   Controller    | -------> |     Model      |
+| (GameView)     |          | (GameController)|          | (GameModel)    |
++----------------+          +-----------------+          +----------------+
+      Display                     Inputs                    Data & Logic
+                                                                |
+                                                                v
+                                                      +-------------------+
+                                                      | Player            |
+                                                      | GameLogic         |
+                                                      | LifeEvent/Choice  |
+                                                      | DeathResult       |
+                                                      +-------------------+
+\end{verbatim}
+\caption{本システムのクラス構成図（MVC連携）}
+\end{figure}
+
+なお、クラス図において\texttt{Player}, \texttt{GameLogic}などは本演習で新規に作成したクラスである。GUIコンポーネント（\texttt{JFrame}, \texttt{JButton}等）はJava標準ライブラリを利用している。
+
+\newpage
+% --- 第1部の続き（第2部）ここから ---
+
+\section{プログラムの説明}
+
+本章では、実装した各クラスの詳細について説明する。
+開発はMVCモデルに基づき分担して行ったため、以下に各担当者が作成したパートごとに記述する。
+
+\subsection{Model層（データとロジック）}
+\begin{flushright}
+文責：志熊 陽斗 (2411610)
+\end{flushright}
+
+Model層は、ゲームの状態管理、イベントデータの定義、およびゲーム進行のルールを担当する部分である。
+ViewやControllerから独立させることで、仕様変更に強い設計を目指した。
+以下に、私が設計・実装した主要なクラスについて、コードの挙動と共に詳細に解説する。
+
+\subsubsection{Playerクラス}
+プレイヤーの現在のステータス（年齢、体力、ストレス、所持金、生死状態）を保持するクラスである。
+フィールドはすべて\texttt{private}で隠蔽し、外部からの不正なアクセスを防いでいる。
+
+\textbf{工夫した点：}
+\begin{itemize}
+    \item \textbf{データの整合性保証}: 単に値を足し引きするだけでなく、上限や下限のチェックをメソッド内で行うことで、体力が100を超えてしまうなどの異常なステータスが発生しないように設計した。
+    \item \textbf{可変時間への対応}: 年齢の加算を固定値ではなく引数で受け取る仕様にし、イベントごとの時間経過の違いに対応させた。
+\end{itemize}
+
+\begin{lstlisting}[caption=Player.java, label=code:player_detail]
+public class Player {
+    // 状態フィールド（外部から直接変更不可）
+    private int age;
+    private int health;
+    private boolean isAlive;
+
+    // 年齢を加算するメソッド
+    public void incrementAge(int years) {
+        this.age += years;  // 引数で渡された年数分だけ加算する
+    }
+
+    // 体力を増減させるメソッド
+    public void changeHealth(int amount) {
+        this.health += amount;            // 値を加算（マイナスの場合は減少）
+        if (this.health > 100) {          // 上限チェック
+            this.health = 100;            // 100を超えたら100に補正
+        }
+        // 下限チェックはここでは行わず、checkVitalityに委ねる設計とした
+    }
+
+    // 生死判定を行うメソッド
+    public void checkVitality() {
+        // 体力が0以下、またはストレスが100以上になったか判定
+        if (this.health <= 0 || this.stress >= 100) {
+            this.isAlive = false;         // 生存フラグをfalse（死亡）に変更
+        }
+    }
+}
+\end{lstlisting}
+
+\textbf{コードの詳細解説：}
+\begin{itemize}
+    \item \textbf{9-11行目}: \texttt{incrementAge}メソッドでは、単純な\texttt{age++}ではなく、引数\texttt{years}を受け取って加算している。これにより、可変時間の処理をModel層の内部で完結させている。
+    \item \textbf{14-19行目}: \texttt{changeHealth}メソッドでは、15-17行目で「上限キャップ処理」を行っている。これにより、回復イベントが連続しても体力が異常値になるバグを防いでいる。
+    \item \textbf{22-27行目}: \texttt{checkVitality}メソッドは、ゲームオーバー条件を集約した場所である。複数のステータス（体力とストレス）を複合的に監視し、どちらか一方でも限界を超えれば即座に\texttt{isAlive}を\texttt{false}にするロジックとなっている。
+\end{itemize}
+
+\subsubsection{Choiceクラス / LifeEventクラス}
+イベントと、それに紐づく選択肢を表現するクラス群である。
+本ゲームの最大の特徴である選択による時間経過の変化をデータ構造レベルでサポートしている。
+こうすることで各イベントを木構造のようにつなげて実装するよりも構造を簡単にできる。
+
+
+
+
+\textbf{工夫した点：}
+\begin{itemize}
+    \item \textbf{経過年数のデータ化}: \texttt{Choice}クラスに\texttt{ageDelta}フィールドを持たせることで、選択肢と時間の重みをセットで管理できるようにした。これにより、プログラム側でこのイベントの時は何年進むとハードコーディングする必要がなくなり、データの独立性が高まった。
+\end{itemize}
+
+\begin{lstlisting}[caption=Choice.java, label=code:choice_detail]
+class Choice {
+    public String text;      // 選択肢の文言
+    public int healthDelta;  // 体力変動値
+    public int ageDelta;     // 経過年数（重要）
+
+    // コンストラクタ
+    public Choice(String text, int h, ..., int ageDelta) {
+        this.text = text;
+        this.healthDelta = h;
+        this.ageDelta = ageDelta; // 引数で受け取った年数を保持
+    }
+    
+    // UI表示用にテキストを整形する
+    public String getText() {
+        // ボタンに「(+4年)」のような情報を付加して返す
+        return text + " (+" + ageDelta + "年)";
+    }
+}
+\end{lstlisting}
+
+\textbf{コードの詳細解説：}
+\begin{itemize}
+    \item \textbf{4行目}: \texttt{int ageDelta}フィールドが、このクラスの核である。ここには「大学に行く」なら\texttt{4}、「休学する」なら\texttt{1}といった整数値が格納される。
+    \item \textbf{15-17行目}: \texttt{getText}メソッドはView層のための補助メソッドである。単に「大学に行く」と表示するだけでなく、「大学に行く (+4年)」と動的に文字列を結合して返すことで、プレイヤーに対して選択のリスク（時間の経過）を可視化している。
+\end{itemize}
+
+\subsubsection{GameLogicクラス}
+現在の年齢を受け取り、適切なイベントを生成して返すクラスである。
+
+\textbf{工夫した点：}
+\begin{itemize}
+    \item \textbf{生成ロジック}: 幼少期は年齢固定イベント、成年期以降はランダムイベントと生成方式を切り替えることで、成長過程のリアリティとゲームとしてのリプレイ性を両立させた。
+    \item \textbf{階層的な条件分岐}: 巨大な\texttt{if-else}文になるのを防ぐため、年齢帯ごとにプライベートメソッド（\texttt{getChildhoodEvent}, \texttt{getAdultEvent}など）に分割し、可読性を維持した。
+\end{itemize}
+
+\begin{lstlisting}[caption=GameLogic.java, label=code:logic_detail]
+class GameLogic {
+    // 年齢に応じたイベントを振り分けるメインメソッド
+    public LifeEvent getEventForAge(int age) {
+        if (age < 23) {
+            return getChildhoodEvent(age); // 22歳以下は固定イベント
+        } else if (age < 65) {
+            return getAdultEvent(age);     // 64歳以下は社会人ランダム
+        } 
+        // ... (以下省略) ...
+    }
+
+    // 社会人時代のランダムイベント生成
+    private LifeEvent getAdultEvent(int age) {
+        LifeEvent event;
+        double rnd = Math.random(); // 0.0〜1.0の乱数を生成
+
+        // 乱数の値によって発生するイベントを分岐させる
+        if (rnd < 0.4) {
+            event = new LifeEvent("【" + age + "歳】仕事のトラブル...");
+            // ... (選択肢の追加) ...
+        } else if (rnd < 0.7) {
+            event = new LifeEvent("【" + age + "歳】結婚式の招待状...");
+        } else {
+            event = new LifeEvent("【" + age + "歳】昇進のチャンス！");
+        }
+        return event;
+    }
+}
+\end{lstlisting}
+
+\textbf{コードの詳細解説：}
+\begin{itemize}
+    \item \textbf{3-10行目}: \texttt{getEventForAge}メソッドは、年齢という単一の入力に対し、適切なイベントオブジェクトを返す役割を果たしている。ここで大まかな年代による分岐を行っている。
+    \item \textbf{15行目}: \texttt{Math.random()}を用いて乱数を生成している。この値はメソッドが呼ばれるたびに変化するため、同じ年齢であっても、プレイするたびに仕事のトラブルが起きたり昇進したりと展開が変わる仕組みを実現している。
+    \item \textbf{18-24行目}: 生成した乱数\texttt{rnd}の範囲（0.0〜0.4, 0.4〜0.7, それ以外）によってイベントを決定している。この閾値を調整することで、イベントの発生確率（レアイベントなど）をコントロールできる設計となっている。
+\end{itemize}
+
+% --- 第2部終了 ---
+
+% --- 第2部の続き（第3部）ここから ---
+
+\subsubsection{GameModelクラス / DeathResultクラス}
+Model層の全機能を統合し、Controller層への単一の窓口を提供するクラスである。
+また、メソッドの戻り値を\texttt{DeathResult}クラス（生死状態・メッセージ・最終年齢をまとめたデータクラス）とすることで、情報の受け渡しを簡潔にした。
+
+\textbf{工夫した点：}
+\begin{itemize}
+    \item \textbf{責務の完全な分離}: 
+    Controller層は\texttt{applyChoice}メソッドを呼ぶだけでよく、内部で\texttt{Player}がどう計算され、\texttt{GameLogic}がどう判定しているかを知る必要がない設計とした。
+    \item \textbf{安全なトランザクション処理}: 
+    「ステータス更新」→「死亡判定」→「年齢加算」という順序をメソッド内で強制することで、死んでいるのに年齢が増えるといった矛盾を防いでいる。
+\end{itemize}
+
+\begin{lstlisting}[caption=GameModel.java, label=code:gamemodel_detail]
+class GameModel {
+    // 選択肢の結果を適用する一連の流れをカプセル化
+    public DeathResult applyChoice(Choice choice) {
+        // 1. ステータス反映
+        player.changeHealth(choice.healthDelta);
+        player.changeStress(choice.stressDelta);
+        player.changeMoney(choice.moneyDelta);
+        
+        // 2. 死亡判定 
+        player.checkVitality();
+        if (!player.isAlive()) {
+            // 死亡していた場合、ここで処理を中断して結果を返す
+            return new DeathResult(
+                DeathResult.Type.DEAD, "過労死...", "...", player.getAge()
+            );
+        }
+
+        // 3. 年齢加算 
+        player.incrementAge(choice.ageDelta);
+        
+        // 4. クリア判定 
+        if (player.getAge() >= Player.HUMAN_LIFESPAN) {
+             return new DeathResult(DeathResult.Type.DEAD, "大往生", "...", player.getAge());
+        }
+
+        // 5. 生存継続
+        return new DeathResult(DeathResult.Type.ALIVE, "", "", player.getAge());
+    }
+}
+\end{lstlisting}
+
+\textbf{コードの詳細解説：}
+\begin{itemize}
+    \item \textbf{5-7行目}: まず最初に、選択された行動によるステータスの増減（体力、ストレス、所持金）を\texttt{Player}オブジェクトに反映させる。
+    \item \textbf{10-16行目}: ステータス変動後、即座に\texttt{checkVitality}を呼び出して生死確認を行う。もし死亡している場合は、\textbf{年齢を加算する前に}メソッドを終了させている。これは過労死した時点で時間は止まるというリアリティを持たせるために必要なロジックである。
+    \item \textbf{19行目}: 生存が確認された場合のみ、\texttt{incrementAge}を実行して時間を進める。ここで初めて次の年齢が確定する。
+    \item \textbf{22-24行目}: 時間が進んだ結果、寿命に達したかどうかを判定する。達していれば「大往生」として結果を返す。
+\end{itemize}
+
+% ここから先は他のメンバーの担当箇所（仮の枠組み）
+\subsection{View層（GUI画面表示）}
+\begin{flushright}
+文責：佐藤 〇〇
+\end{flushright}
+（※ここに佐藤さんの担当箇所の説明が入ります。Swingコンポーネントの配置や、イベント内容のテキストエリア表示などの工夫点について記述されます。）
+
+\subsection{Controller層（制御フロー）}
+\begin{flushright}
+文責：北村 〇〇
+\end{flushright}
+（※ここに北村さんの担当箇所の説明が入ります。ActionListenerの実装や、ModelとViewの橋渡し処理について記述されます。）
+
+\section{実行例}
+本プログラムの主要な機能について、実際の実行画面を用いて説明する。
+
+\subsection{ゲーム開始〜幼少期}
+プログラムを起動すると、0歳からゲームが開始される。
+画面上部には現在の年齢、体力（HP）、ストレス、所持金が表示され、中央にはイベントテキスト、下部には選択肢ボタンが表示される。
+
+\begin{figure}[H]
+    \centering
+    % スクリーンショット画像をここに貼る
+    % \includegraphics[width=10cm]{exec_start.png}
+    \begin{verbatim}
+    [画面イメージ: 0歳]
+    年齢: 0歳
+    HP: 50 | ストレス: 0 | 所持金: 0円
+    --------------------------------------------------
+    【0歳】誕生。光に包まれて、あなたの人生が始まります。
+    --------------------------------------------------
+    [大声で泣いて自己主張 (+3年)]
+    [静かに親を見つめる (+3年)]
+    \end{verbatim}
+    \caption{ゲーム開始直後の画面（0歳）}
+\end{figure}
+
+ボタンには「(+3年)」と表示されており、選択すると3歳へジャンプすることが視覚的に分かるようになっている。
+
+\subsection{人生の分岐点（18歳〜）}
+18歳のイベントでは、進路選択が行われる。ここで「大学進学（+1年）」を選ぶか、「就職（+5年）」を選ぶかによって、その後の20代のイベント内容と経過速度が変化する。
+
+\begin{figure}[H]
+    \centering
+    % スクリーンショット画像をここに貼る
+    % \includegraphics[width=10cm]{exec_branch.png}
+    \begin{verbatim}
+    [画面イメージ: 18歳]
+    年齢: 18歳
+    HP: 80 | ストレス: 40 | 所持金: 0円
+    --------------------------------------------------
+    【18歳】進路選択。大人への第一歩。
+    --------------------------------------------------
+    [大学進学(奨学金なし) (+1年)]
+    [大学進学(奨学金あり) (+1年)]
+    [就職して自立 (+5年)]
+    \end{verbatim}
+    \caption{進路選択の画面（18歳）}
+\end{figure}
+
+\subsection{ゲームオーバーとエンディング}
+体力が0になるか、ストレスが100に達するとゲームオーバーとなる。
+一方、無事に100歳を迎えると「大往生」となり、クリアダイアログが表示される。
+
+\begin{comment}
+    以下考察の下書き
+
+\section{考察}
+当初0歳から100歳までの人生シュミレーションを作成するにあたって、各イベントの管理についてイベント同士を繋げて木構造のように分岐させて実装しようとした。
+しかし、この方法では構造が非常に複雑になってしまうため、別の設計案を考えた時に今回のような加減時間システムによる分岐構造を考えた。
+これはModel層のクラス設計（\texttt{Choice}クラスへの\texttt{ageDelta}導入）により完全に実現できた。
+今回の構造であっても、あるイベントで人生が分岐し、数年経ってまた合流するような複雑な場合でも、分岐を決定づける選択肢の加時間を合流するまで経つ時間に設定し、問題なく実装できた。
+こういった複雑な構造であっても加減時間を変えるだけで実装できる点で、木構造のように設計するよりも設計が簡潔であると言える。
+また、単調になりがちな社会人パートにおいて、5年刻みのイベントとランダム要素を組み合わせたことで、プレイするたびに結婚、昇進、病気など異なる人生が体験できるようになった点は、ゲームとしての面白さを高める上で効果的であったと考える。
+しかし、今回の構造で設計した時、一度プロトタイプを作成した後にイベントを追加したい場合、木構造のように設計した場合だとイベントのつながりを変えるだけでいいが、今回の構造だと、各年齢のフェーズが重ならないように年齢を書き換える必要があったので、
+その点では木構造にも利点があったと言える。\\
+また今回はイベントを年齢や乱数で場合分けしていたため、イベントごとに繋がりがなくゲームとしての面白みには欠けていた部分があった。
+そのため今回採用した設計方式でどのようにイベント同士につながりを持たせて、人生に深みを出すかが今後の課題と言える。
+現在の実装では、イベントデータが\texttt{GameLogic}クラス内のソースコードに直接記述されている。そのため、新しいイベントを追加するにはプログラムの再コンパイルが必要となる。
+今後の改良点として、イベントデータを外部ファイル（CSVやJSON）として管理し、プログラム起動時に読み込む仕組みを導入することで、シナリオライターがプログラムを触らずにイベントを追加・修正できる設計にすべきである。
+\end{comment}
+
+\section{考察}
+
+\subsection{志熊 陽斗（Model担当）}
+本プログラムの開発において、当初は0歳から100歳までの人生シミュレーションを、各ライフイベントをノード、選択肢をエッジとした木構造として実装することを検討した。
+しかし、100年という長期スパンにおいて全ての分岐を木構造で管理しようとすると、階層が深くなりすぎ、イベント総数が指数関数的に増加して管理が困難になるという問題に直面した。
+そこで、本開発では代替案として、Model層の\texttt{Choice}クラスに\texttt{ageDelta}（経過年数）を導入し
+、現在の年齢というステータスを参照してイベントを呼び出す可変時間ステップ方式を採用した。
+この設計の結果、人生が分岐し、数年後に再び同じキャリアパスに合流するような複雑なシナリオであっても、分岐ごとの加算年数を調整して
+ターゲットとなる年齢に合わせるだけで実装できた。これにより、複雑なポインタ管理をすることなく擬似的な分岐構造を実現でき、木構造を採用するよりも設計を大幅に簡潔化できたと言える。
+また、単調になりがちな社会人パートにおいて、5年刻みの時間経過と乱数によるイベント選出を組み合わせた点は、実装コストを抑えつつ、結婚、昇進、病気などのイベントによるプレイごとの多様性を確保し、
+ゲームとしての面白さを高める上で非常に効果的であった。
+
+一方で、今回の設計手法には課題も残った。第一にイベントの挿入・変更コストである。木構造であれば、イベント間に新しいイベントを挿入する場合、親ノードと子ノードのリンクを書き換えるだけで済む。
+しかし、今回採用した年齢に依存する方式では、中間にイベントを追加しようとすると、後続のイベント発生年齢が重複しないよう全て書き換える必要が生じた。拡張性・保守性の観点では、木構造のような相対的な参照方式に分があったと言える。
+第二にストーリーの連続性である。現在はイベントの発生条件が年齢と乱数のみに依存しているため、イベント間の因果関係が希薄である。
+これを解決するためには、単に年齢を進めるだけでなく、\texttt{Player}クラスに学歴や既婚といった状態フラグを持たせ、\texttt{GameLogic}でのイベント選出時にそれらを参照させるなどの対策が考えられる。
+これにより、今回採用した可変時間ステップの簡潔さを維持しつつ、木構造のような文脈のあるストーリー展開を実現することが今後の課題である。
+
+\section{各自の反省と感想}
+
+\subsection{志熊 陽斗（Model担当）}
+私はModel層を担当し、主にデータ構造とロジックの実装を行った。
+開発において最も苦労したのは、自分の現在の技術レベルで実装可能な範囲とゲームとしての面白さ」をいかに両立させるかという点である。当初は複雑な分岐構造も検討したが、それを自身の技術でどう簡潔に表現するかを試行錯誤する中で、ゲーム制作の難しさと、工夫によってそれが実現できた時の楽しさを強く感じることができた。
+
+技術面では、ViewやControllerから内部ロジックを隠蔽する\texttt{GameModel}の設計に注力した。シンプルなインターフェースにしたことでチームメンバーとの連携がスムーズに進み、MVCモデルにおける分業のしやすさを肌で感じることができた。今回の演習を通して、オブジェクト指向設計の重要性と、制約の中で工夫することの面白さを認識する良い機会となった。
+
+\subsection{佐藤 〇〇（View担当）}
+（※ここに佐藤さんの感想が入ります。Swingでの画面作成の苦労や、Modelからデータを受け取って表示する際の連携についての感想などが記述されます。）
+
+\subsection{北村 〇〇（Controller担当）}
+（※ここに北村さんの感想が入ります。イベントリスナーの実装や、ゲームループの制御についての感想などが記述されます。）
+
+\appendix
+\section{付録1：操作法マニュアル}
+
+\subsection*{起動方法}
+配布された\texttt{InfiniteLifeTunnel.jar}をダブルクリックするか、コマンドラインから以下のコマンドを実行してください。
+\begin{verbatim}
+java -jar InfiniteLifeTunnel.jar
+\end{verbatim}
+
+\subsection*{画面の見方}
+\begin{itemize}
+    \item \textbf{上部エリア}: 現在の年齢、体力、ストレス、所持金が表示されます。
+    \item \textbf{中央エリア}: 現在発生しているイベントのストーリーが表示されます。
+    \item \textbf{下部ボタン}: プレイヤーが取れる行動の選択肢です。「(+3年)」などの表記は、その選択肢を選んだ場合の経過年数を表します。
+\end{itemize}
+
+\subsection*{遊び方}
+\begin{enumerate}
+    \item 画面下部の選択肢ボタンをクリックして、人生の選択を行ってください。
+    \item 選択結果に応じて、ステータスが変動し、年齢が進みます。
+    \item 体力が0になるか、ストレスが100になるとゲームオーバーです。無理のない選択を心がけましょう。
+    \item 100歳まで生き延びることができればゲームクリア（大往生）です。
+\end{enumerate}
+
+% --- 第3部終了 ---
+
+% --- 第3部の続き（第4部・完）ここから ---
+
+\section{付録2：プログラムリスト}
+以下に、本プロジェクトの全ソースコードを掲載する。
+
+\subsection*{1. Main.java}
+\begin{lstlisting}[caption=Main.java]
+import javax.swing.SwingUtilities;
+
+
+//アプリケーションのエントリーポイント
+public class Main {
+    public static void main(String[] args) {
+        // SwingアプリはEDTで起動する
+        SwingUtilities.invokeLater(() -> {
+            new GameController();
+        });
+    }
+}
+\end{lstlisting}
+
+\subsection*{2. Model層}
+
+\begin{lstlisting}[caption=Player.java]
+
+//プレイヤーの状態（年齢、体力、ストレス、金）を管理するクラス
+public class Player {
+    public static final int HUMAN_LIFESPAN = 100; // 寿命
+
+    //パラメータ
+    private int age;
+    private int health;
+    private int stress;
+    private long money;
+    private boolean isAlive;
+
+    public Player() {
+        this.age = 0;       // 0歳スタート
+        this.health = 50;   // 乳幼児期は体力低め
+        this.stress = 0;
+        this.money = 0;
+        this.isAlive = true;
+    }
+
+    public void incrementAge(int years) {
+        this.age += years;
+    }
+
+    public void changeHealth(int amount) {
+        this.health += amount;
+        if (this.health > 100) this.health = 100;
+    }
+
+    public void changeStress(int amount) {
+        this.stress += amount;
+        if (this.stress < 0) this.stress = 0;
+    }
+
+    public void changeMoney(long amount) {
+        this.money += amount;
+    }
+
+    public void checkVitality() {
+        if (this.health <= 0 || this.stress >= 100) {
+            this.isAlive = false;
+        }
+    }
+
+    // Getter methods
+    public int getAge() { return age; }
+    public boolean isAlive() { return isAlive; }
+    public int getHealth() { return health; }
+    public int getStress() { return stress; }
+    public long getMoney() { return money; }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption=Choice.java / LifeEvent.java]
+import java.util.ArrayList;
+import java.util.List;
+
+
+//1つの選択肢データを表すクラス
+class Choice {
+    //パラメータの変動
+    public String text;
+    public int healthDelta;
+    public int stressDelta;
+    public long moneyDelta;
+    public int ageDelta; 
+
+    public Choice(String text, int h, int s, long m, int ageDelta) {
+        this.text = text;
+        this.healthDelta = h;
+        this.stressDelta = s;
+        this.moneyDelta = m;
+        this.ageDelta = ageDelta;
+    }
+    
+    public String getText() {
+        return text + " (+" + ageDelta + "年)";
+    }
+}
+
+
+//1つのイベントを表すクラス
+class LifeEvent {
+    private String title;
+    private List<Choice> choices;
+
+    public LifeEvent(String title) {
+        this.title = title;
+        this.choices = new ArrayList<>();
+    }
+
+    public void addChoice(String text, int h, int s, long m, int ageDelta) {
+        choices.add(new Choice(text, h, s, m, ageDelta));
+    }
+
+    public String getTitle() { return title; }
+    public String getText() { return title; }
+    public List<Choice> getChoices() { return choices; }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption=DeathResult.java]
+//ゲームの進行結果（生存、死亡、年齢など）をControllerへ渡すためのクラス
+class DeathResult {
+    public enum Type { ALIVE, DEAD }
+    
+    public Type type;
+    public String title;
+    public String message;
+    public int age;
+
+    public DeathResult(Type type, String title, String message, int age) {
+        this.type = type;
+        this.title = title;
+        this.message = message;
+        this.age = age;
+    }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption=GameLogic.java]
+//年齢に応じたイベントを生成・選択するクラス
+class GameLogic {
+
+    public LifeEvent getEventForAge(int age) {
+        if (age < 23) {
+            return getChildhoodEvent(age);
+        } else if (age < 65) {
+            return getAdultEvent(age);
+        } else if (age < 100) {
+            return getSeniorEvent(age);
+        } else {
+            return getEndingEvent();
+        }
+    }
+
+    // 0歳〜22歳：子供・学生時代
+    private LifeEvent getChildhoodEvent(int age) {
+        LifeEvent event = new LifeEvent("イベントエラー");
+
+        switch (age) {
+            case 0:
+                event = new LifeEvent("【0歳】誕生。光に包まれて人生が始まります。");
+                event.addChoice("大声で泣いて自己主張", 5, 0, 0, 3);
+                event.addChoice("静かに親を見つめる", 0, 0, 0, 3);
+                break;
+            case 3:
+                event = new LifeEvent("【3歳】自我の芽生え。「イヤイヤ期」です。");
+                event.addChoice("何でも「イヤ！」と拒否", 5, 10, 0, 3);
+                event.addChoice("いい子にして褒められる", 0, -5, 0, 3);
+                event.addChoice("積み木に熱中する", 0, 0, 0, 3);
+                break;
+            case 6:
+                event = new LifeEvent("【6歳】小学校入学。ランドセルが歩いているようです。");
+                event.addChoice("すぐに隣の子と話す", 5, 5, 0, 2);
+                event.addChoice("緊張して固まる", -2, 10, 0, 2);
+                break;
+            case 8:
+                event = new LifeEvent("【8歳】低学年。習い事を始めますか？");
+                event.addChoice("スイミングに通う", 10, 5, -50000, 2);
+                event.addChoice("ピアノを習う", 0, 5, -100000, 2);
+                event.addChoice("公園で毎日遊ぶ", 5, -5, 0, 2);
+                break;
+            case 10:
+                event = new LifeEvent("【10歳】1/2成人式。");
+                event.addChoice("目立ちたがり屋のリーダー", 0, 10, 0, 2);
+                event.addChoice("聞き上手なサポーター", 0, 0, 0, 2);
+                event.addChoice("我が道を行く一匹狼", 5, -5, 0, 2);
+                break;
+            case 12:
+                event = new LifeEvent("【12歳】卒業間近。バレンタインの思い出。");
+                event.addChoice("好きな人に告白する", 5, 20, -5000, 1);
+                event.addChoice("友達とチョコ交換", 0, 0, -3000, 1);
+                event.addChoice("興味ないフリをする", 0, -5, 0, 1);
+                break;
+            case 13:
+                event = new LifeEvent("【13歳】中学生。部活動の厳しさ。");
+                event.addChoice("レギュラー目指して朝練", 10, 15, 0, 1);
+                event.addChoice("サボりながら楽しくやる", -5, -5, 0, 1);
+                event.addChoice("幽霊部員になる", 0, -5, 0, 1);
+                break;
+            case 14:
+                event = new LifeEvent("【14歳】中二病の季節。");
+                event.addChoice("深夜ラジオに投稿する", -5, -5, 0, 1);
+                event.addChoice("ポエムを書き溜める", 0, 0, 0, 1);
+                event.addChoice("悪い先輩とつるむ", -10, 5, 0, 1);
+                break;
+            case 15:
+                event = new LifeEvent("【15歳】高校受験。人生最初の試練。");
+                event.addChoice("トップ高を目指して猛勉強", -10, 40, -200000, 1);
+                event.addChoice("確実な学校を選ぶ", 5, 10, 0, 1);
+                event.addChoice("勉強より思い出作り", 0, -10, 0, 1);
+                break;
+            case 16:
+                event = new LifeEvent("【16歳】高校入学。環境の変化。");
+                event.addChoice("バイトを始めて社会を知る", -5, 10, 300000, 1);
+                event.addChoice("帰宅部でゲーム三昧", -5, -10, 0, 1);
+                event.addChoice("恋人を作る！", 5, 20, -50000, 1);
+                break;
+            case 17:
+                event = new LifeEvent("【17歳】修学旅行の夜。");
+                event.addChoice("好きな人の話で盛り上がる", 5, -5, 0, 1);
+                event.addChoice("先生に見つかり正座", -5, 10, 0, 1);
+                event.addChoice("一人で早く寝る", 5, -5, 0, 1);
+                break;
+            case 18:
+                event = new LifeEvent("【18歳】進路選択。大人への第一歩。");
+                event.addChoice("大学進学(奨学金なし)", 0, 10, -5000000, 1);
+                event.addChoice("大学進学(奨学金あり)", 0, 20, -1000000, 1);
+                event.addChoice("就職して自立", -5, 30, 2000000, 5);
+                break;
+            case 19:
+                event = new LifeEvent("【19歳】大学1年。サークルの新歓。");
+                event.addChoice("飲みサーでウェイウェイ", -10, -10, -100000, 1);
+                event.addChoice("真面目な研究会に入る", 0, 5, 0, 1);
+                break;
+            case 20:
+                event = new LifeEvent("【20歳】成人式。地元の友人と再会。");
+                event.addChoice("朝まで飲み明かす", -10, -5, -30000, 1);
+                event.addChoice("行かずに家で過ごす", 5, -5, 0, 1);
+                break;
+            case 21:
+                event = new LifeEvent("【21歳】就職活動。お祈りメール。");
+                event.addChoice("自己分析をやり直す", -5, 10, 0, 1);
+                event.addChoice("面接を受けまくる", -10, 30, -50000, 1);
+                event.addChoice("現実逃避して旅に出る", 5, -20, -200000, 1);
+                break;
+            case 22:
+                event = new LifeEvent("【22歳】卒業論文と卒業旅行。");
+                event.addChoice("卒論を完璧に仕上げる", -10, 20, 0, 1);
+                event.addChoice("海外へ卒業旅行", 5, -10, -300000, 1);
+                break;
+            default:
+                event = new LifeEvent("【" + age + "歳】時は流れます...");
+                event.addChoice("次へ進む", 0, 0, 0, 1);
+                break;
+        }
+        return event;
+    }
+
+    // 23歳〜64歳：社会人時代（ランダムでイベントを選択）
+    private LifeEvent getAdultEvent(int age) {
+        LifeEvent event = new LifeEvent("社会人生活");
+        double rnd = Math.random();
+
+        if (age < 35) {
+            if (rnd < 0.4) {
+                event = new LifeEvent("【" + age + "歳】仕事で大きなミス...");
+                event.addChoice("正直に謝る", 0, 20, 0, 3);
+                event.addChoice("隠蔽しようとする", -5, 40, 0, 3);
+                event.addChoice("同僚のせいにする", -5, 10, 0, 3);
+            } else if (rnd < 0.7) {
+                event = new LifeEvent("【" + age + "歳】友人たちが結婚していく。");
+                event.addChoice("婚活パーティーに参加", -5, 10, -50000, 3);
+                event.addChoice("仕事こそが恋人", -10, 20, 500000, 3);
+                event.addChoice("一人の時間を楽しむ", 5, -10, -100000, 3);
+            } else {
+                event = new LifeEvent("【" + age + "歳】初めての大きな昇進チャンス！");
+                event.addChoice("休日返上で働く", -20, 30, 2000000, 3);
+                event.addChoice("ワークライフバランス重視", 5, -5, 500000, 3);
+            }
+        } else if (age < 50) {
+            if (rnd < 0.4) {
+                event = new LifeEvent("【" + age + "歳】マイホーム購入を検討中。");
+                event.addChoice("35年ローンで一軒家", 5, 30, -40000000, 4);
+                event.addChoice("都心の中古マンション", 5, 10, -25000000, 4);
+                event.addChoice("気楽な賃貸暮らし", 0, -5, -2000000, 4);
+            } else if (rnd < 0.7) {
+                event = new LifeEvent("【" + age + "歳】子供の反抗期と教育費。");
+                event.addChoice("塾に課金する", -5, 10, -3000000, 4);
+                event.addChoice("家族旅行で絆を深める", 5, -5, -500000, 4);
+                event.addChoice("放任主義", 0, 10, 0, 4);
+            } else {
+                event = new LifeEvent("【" + age + "歳】中間管理職の悲哀。");
+                event.addChoice("心を無にして耐える", -5, 20, 1000000, 4);
+                event.addChoice("部下を飲みに連れて行く", -10, 5, -200000, 4);
+                event.addChoice("副業を始める", -10, 10, 2000000, 4);
+            }
+        } else {
+            if (rnd < 0.4) {
+                event = new LifeEvent("【" + age + "歳】親の介護が必要になってきた。");
+                event.addChoice("同居して介護する", -20, 40, 1000000, 5);
+                event.addChoice("施設にお願いする", 5, 10, -10000000, 5);
+                event.addChoice("兄弟に任せる", 0, 20, 0, 5);
+            } else if (rnd < 0.7) {
+                event = new LifeEvent("【" + age + "歳】健康診断でE判定が出た。");
+                event.addChoice("お酒・タバコをやめる", 10, 20, 500000, 5);
+                event.addChoice("気にせず豪遊する", -20, -10, -1000000, 5);
+                event.addChoice("高いサプリを買う", 0, 0, -500000, 5);
+            } else {
+                event = new LifeEvent("【" + age + "歳】役職定年。給料が下がる。");
+                event.addChoice("プライドを捨てて働く", -5, 10, 500000, 5);
+                event.addChoice("早期リタイアして田舎へ", 10, -10, -2000000, 5);
+                event.addChoice("会社にしがみつく", -10, 30, 1000000, 5);
+            }
+        }
+        return event;
+    }
+
+    // 65歳〜99歳：老後（ランダムでイベントを選択）
+    private LifeEvent getSeniorEvent(int age) {
+        LifeEvent event = new LifeEvent("老後の日々");
+        double rnd = Math.random();
+
+        if (age < 75) {
+            if (rnd < 0.3) {
+                event = new LifeEvent("【" + age + "歳】再雇用終了。毎日が日曜日です。");
+                event.addChoice("ボランティアに参加", 5, -5, -10000, 3);
+                event.addChoice("シルバー人材で働く", -5, 5, 500000, 3);
+                event.addChoice("家でテレビ三昧", -10, 5, 0, 3);
+            } else if (rnd < 0.6) {
+                event = new LifeEvent("【" + age + "歳】孫が遊びに来ました。");
+                event.addChoice("おもちゃを買い与える", 5, -10, -100000, 3);
+                event.addChoice("昔話を聞かせる", 5, 0, 0, 3);
+                event.addChoice("疲れるので居留守を使う", 0, 5, 0, 3);
+            } else {
+                event = new LifeEvent("【" + age + "歳】夫婦で久しぶりの旅行。");
+                event.addChoice("豪華クルーズ世界一周", 10, -10, -5000000, 3);
+                event.addChoice("近場の温泉旅館", 5, -5, -100000, 3);
+            }
+        } else if (age < 90) {
+            if (rnd < 0.3) {
+                event = new LifeEvent("【" + age + "歳】運転免許の返納を迫られています。");
+                event.addChoice("素直に返納する", 0, -5, 0, 3);
+                event.addChoice("まだ運転できると怒る", 0, 10, 0, 3);
+                event.addChoice("電動カートを買う", 0, 0, -200000, 3);
+            } else if (rnd < 0.6) {
+                event = new LifeEvent("【" + age + "歳】親しい友人の葬式がありました。");
+                event.addChoice("自分の終活を始める", 0, -5, -500000, 3);
+                event.addChoice("寂しさを紛らわすため飲む", -10, -5, -20000, 3);
+                event.addChoice("死後の世界について考える", 0, 10, 0, 3);
+            } else {
+                event = new LifeEvent("【" + age + "歳】足腰が弱ってきました。");
+                event.addChoice("リハビリに励む", 5, 5, -100000, 3);
+                event.addChoice("老人ホーム入居を検討", 0, -10, -10000000, 3);
+                event.addChoice("家から出なくなる", -15, 0, 0, 3);
+            }
+        } else {
+            event = new LifeEvent("【" + age + "歳】100歳は目前です。今の心境は？");
+            event.addChoice("人生に感謝する", 10, -20, 0, 2);
+            event.addChoice("まだやり残したことがある", 5, 10, 0, 2);
+            event.addChoice("家族に「ありがとう」と伝える", 10, -10, 0, 2);
+        }
+        return event;
+    }
+
+    private LifeEvent getEndingEvent() {
+        LifeEvent event = new LifeEvent("【100歳】大往生");
+        event.addChoice("静かに目を閉じる...", 0, 0, 0, 0);
+        return event;
+    }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption=GameModel.java]
+//Controllerからの要求を一手に引き受けるクラス。
+class GameModel {
+    private final Player player;
+    private final GameLogic logic;
+
+    public GameModel() {
+        this.player = new Player();
+        this.logic = new GameLogic();
+    }
+
+    public Player getPlayer() {
+        return player;
+    }
+
+    public LifeEvent nextEvent() {
+        return logic.getEventForAge(player.getAge());
+    }
+
+    // 選択肢を適用し、結果（生存/死亡/クリア）を返す
+    public DeathResult applyChoice(Choice choice) {
+        //ステータス反映
+        player.changeHealth(choice.healthDelta);
+        player.changeStress(choice.stressDelta);
+        player.changeMoney(choice.moneyDelta);
+        
+        //死亡判定
+        player.checkVitality();
+        if (!player.isAlive()) {
+            return new DeathResult(
+                DeathResult.Type.DEAD, 
+                "過労死・ストレス死", 
+                "あなたの人生はここで幕を閉じました。\n無理をしすぎたようです...", 
+                player.getAge()
+            );
+        }
+
+        // 3. 年齢加算
+        player.incrementAge(choice.ageDelta);
+
+        // 4. クリア判定
+        if (player.getAge() >= Player.HUMAN_LIFESPAN) {
+             return new DeathResult(
+                DeathResult.Type.DEAD, 
+                "大往生", 
+                "100年の人生を全うしました。\n素晴らしい人生でしたね。", 
+                player.getAge()
+            );
+        }
+
+        // 5. 生存継続
+        return new DeathResult(DeathResult.Type.ALIVE, "", "", player.getAge());
+    }
+}
+\end{lstlisting}
+
+\subsection*{3. View層 (GUI)}
+\begin{lstlisting}[caption=GameView.java]
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionListener;
+import java.util.List;
+
+//画面表示を担当するクラス (Swing)
+class GameView extends JFrame {
+    private final JLabel ageLabel = new JLabel();
+    private final JLabel statsLabel = new JLabel(); 
+    private final JTextArea eventArea = new JTextArea();
+    private final JPanel buttonPanel = new JPanel();
+
+    public GameView(ActionListener listener) {
+        setTitle("人生ロングラン (0-100歳)");
+        setSize(700, 600);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setLayout(new BorderLayout());
+
+        // 上部パネル
+        JPanel topPanel = new JPanel(new GridLayout(2, 1));
+        topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        ageLabel.setFont(new Font("Meiryo", Font.BOLD, 28));
+        ageLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        
+        statsLabel.setFont(new Font("Meiryo", Font.PLAIN, 16));
+        statsLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+        topPanel.add(ageLabel);
+        topPanel.add(statsLabel);
+        add(topPanel, BorderLayout.NORTH);
+
+        // 中央パネル
+        eventArea.setEditable(false);
+        eventArea.setLineWrap(true);
+        eventArea.setWrapStyleWord(true);
+        eventArea.setFont(new Font("Meiryo", Font.PLAIN, 18));
+        eventArea.setMargin(new Insets(30, 30, 30, 30));
+        add(new JScrollPane(eventArea), BorderLayout.CENTER);
+
+        // 下部パネル
+        buttonPanel.setLayout(new GridLayout(0, 1, 10, 10));
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        add(buttonPanel, BorderLayout.SOUTH);
+
+        setLocationRelativeTo(null);
+        setVisible(true);
+    }
+
+    public void updateDisplay(Player player) {
+        ageLabel.setText("年齢: " + player.getAge() + "歳");
+        String moneyColor = player.getMoney() < 0 ? "red" : "black";
+        statsLabel.setText(String.format(
+            "<html>HP: %d | ストレス: %d | 所持金: <font color='%s'>%,d円</font></html>", 
+            player.getHealth(), player.getStress(), moneyColor, player.getMoney()));
+    }
+
+    public void showEvent(LifeEvent event, ActionListener listener) {
+        eventArea.setText(event.getText());
+        buttonPanel.removeAll();
+        List<Choice> choices = event.getChoices();
+        for (int i = 0; i < choices.size(); i++) {
+            JButton b = new JButton(choices.get(i).getText());
+            b.setFont(new Font("Meiryo", Font.PLAIN, 16));
+            b.setPreferredSize(new Dimension(0, 50));
+            b.setActionCommand(String.valueOf(i));
+            b.addActionListener(listener);
+            buttonPanel.add(b);
+        }
+        buttonPanel.revalidate();
+        buttonPanel.repaint();
+    }
+
+    public void showGameOver(String title, String message, int age) {
+        JOptionPane.showMessageDialog(this, message + "\n\n最終年齢: " + age + "歳", title, JOptionPane.PLAIN_MESSAGE);
+        System.exit(0);
+    }
+}
+\end{lstlisting}
+
+\subsection*{4. Controller層}
+\begin{lstlisting}[caption=GameController.java]
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+
+
+//ゲームの進行制御を担当するクラス
+class GameController implements ActionListener {
+    private final GameModel model;
+    private final GameView view;
+    private LifeEvent currentEvent;
+
+    public GameController() {
+        model = new GameModel();
+        view = new GameView(this);
+        nextTurn();
+    }
+
+    // 次のターンへ進む
+    private void nextTurn() {
+        view.updateDisplay(model.getPlayer());
+        currentEvent = model.nextEvent();
+        view.showEvent(currentEvent, this);
+    }
+
+    // ボタンクリック時の処理
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        int index = Integer.parseInt(e.getActionCommand());
+        if (index < 0 || index >= currentEvent.getChoices().size()) return;
+
+        Choice selected = currentEvent.getChoices().get(index);
+        DeathResult result = model.applyChoice(selected);
+
+        if (result.type == DeathResult.Type.ALIVE) {
+            nextTurn();
+        } else {
+            view.updateDisplay(model.getPlayer());
+            view.showGameOver(result.title, result.message, result.age);
+        }
+    }
+}
+\end{lstlisting}
+
+\end{document}
+% --- 第4部（完） ---
